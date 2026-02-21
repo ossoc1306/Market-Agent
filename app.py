@@ -11,7 +11,7 @@ import streamlit as st
     # --- ROBUST DATA MINING FUNCTION ---
     def get_safe_data(ticker, label):
         try:
-            d = yf.download(ticker, period="1y", progress=False)
+            d = yf.download(ticker, period="1mo", progress=False)
             if not d.empty:
                 return d['Close'].iloc[-1].item()
             return 0.0

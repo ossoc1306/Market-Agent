@@ -18,7 +18,7 @@ import streamlit as st
         except:
             return 0.0
     
-    # Fetching individually to prevent KeyErrors
+    # Fetching individually
     spx_now = get_safe_data("^GSPC", "S&P 500")
     btc_now = get_safe_data("BTC-USD", "Bitcoin")
     gold_now = get_safe_data("GC=F", "Gold")
@@ -42,7 +42,6 @@ import streamlit as st
     st.markdown(f"### 🚀 Market Sentiment: `{fng_status}`")
     cols1 = st.columns(6)
     
-    # Helper for metrics to handle 0.0/NaN gracefully
     def show_metric(col, label, value, prefix="", suffix=""):
         if value == 0:
             col.metric(label, "Data Pending", "🔄 Refreshing")
@@ -64,22 +63,19 @@ import streamlit as st
     with col_left:
         with st.expander("₿ Crypto & Bitcoin Intelligence", expanded=True):
             st.write(f"**Current BTC:** ${btc_now:,.2f}")
-            st.info("Agent Logic: Bitcoin is acting as a 'Macro Leading Indicator.' Strength here often precedes a broader equity rally.")
+            st.info("Agent Logic: Bitcoin is acting as a 'Macro Leading Indicator.'")
     
         with st.expander("🌍 Global & Foreign Markets", expanded=True):
             st.write(f"**VXUS (Intl Stocks):** ${intl_now:.2f}")
             st.write(f"**UUP (Dollar Strength):** {dxy_now:.2f}")
-            st.warning("Substance: A rising DXY (Dollar) typically drains liquidity from Emerging Markets and Gold.")
     
     with col_right:
         with st.expander("📉 Fear & Greed: Detailed Gauge", expanded=True):
             st.write(f"**VIX Index:** {vix_now:.2f}")
-            st.error("Sentiment Logic: High VIX readings suggest institutional hedging is increasing, creating a defensive posture.")
     
         with st.expander("🏦 Rates & Monetary Policy", expanded=True):
             st.write(f"**10-Year Yield:** {tnx_now:.2f}%")
             st.write("**US Prime Rate:** 6.75%")
-            st.info("Logic: The spread between growth (QQQ) and rates (10Y) remains the primary driver of equity multiples.")
     
-    st.caption(f"Last Agent Update: {datetime.now().strftime('%Y-%m-%d %H:%M')} | Data: Yahoo Finance")
+    st.caption(f"Last Agent Update: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
     

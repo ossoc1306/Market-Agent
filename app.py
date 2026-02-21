@@ -2,20 +2,25 @@ import streamlit as st
 import yfinance as yf
 from datetime import datetime
 
-# PAGE CONFIG - Set to wide to accommodate 6 columns
+# PAGE CONFIG - Wide layout to accommodate 6 columns
 st.set_page_config(page_title="SPX Market Intelligence", layout="wide")
 
 st.title("🛡️ SPX Market Intelligence")
 st.subheader("Multi-Agent Regime Overlay")
 
 # --- DATA MINING ---
-# Fetching SPX, Yields, and VIX
-data = yf.download(["^SPX", "^TNX", "^VIX", "SHY"], period="2y", progress=False)
+# Fetching SPX, 10yr Yield (^TNX), 2yr Yield (^ZT=F), VIX, and a Treasury ETF
+data = yf.download(["^SPX", "^TNX", "^ZT=F", "^VIX", "SHY"], period="2y", progress=False)
 
 # Momentum Calculations
 spx_close = data['Close']['^SPX'].iloc[-1]
 sma_200d = data['Close']['^SPX'].rolling(window=200).mean().iloc[-1]
 sma_40w = data['Close']['^SPX'].rolling(window=280).mean().iloc[-1] 
+
+# Interest Rate Calculations
+ten_year = data['Close']['^TNX'].iloc[-1]
+two_year = data['Close']['^ZT=F'].iloc[-1]
+yield_spread = ten_year - two_year
 
 # --- THE EXPANDED OVERLAY (6 Columns) ---
 cols = st.columns(6)
@@ -51,14 +56,15 @@ with col_left:
 
 with col_right:
     with st.expander("🏦 Yield Curve & Interest Rates", expanded=True):
-        st.write(f"**10-Year Note:** {data['Close']['^TNX'].iloc[-1]:.2f}%")
+        st.write(f"**10-Year Note:** {ten_year:.2f}%")
+        st.write(f"**2-Year Note:** {two_year:.2f}%")
+        st.write(f"**2yr/10yr Spread:** {yield_spread:.2f}% ({'Inverted' if yield_spread < 0 else 'Normal'})")
         st.write("**US Prime Rate:** 8.50%")
-        st.error("Fixed Income Logic: A restrictive Prime Rate is weighing on small-cap earnings and consumer credit.")
+        st.error("Fixed Income Logic: A restrictive Prime Rate and persistent curve inversion historically weigh on small-cap earnings and bank lending.")
 
     with st.expander("📜 Fiscal Policy & Treasury Issuance", expanded=True):
         st.write("**Issuance Policy:** Quarterly Refunding Announcement (QRA)")
         st.write("**Current Stance:** Increasing longer-dated bond supply (Coupons).")
-        # NEW LINE REQUESTED
         st.write("**Liquidity & Duration Summary:** The shift from Bills (short-term) to Coupons (long-term) increases 'Duration' in the market. This drains bank reserves and forces yields higher, creating a liquidity drag on the SPX.")
         st.info("Impact: Higher supply of long-term notes acts as a 'shadow' rate hike by tightening financial conditions.")
 

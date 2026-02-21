@@ -58,7 +58,7 @@ import streamlit as st
     
     st.divider()
     
-    # --- THE SUBSTANCE (DEEP DIVES) ---
+    # --- THE SUBSTANCE ---
     col_left, col_right = st.columns(2)
     
     with col_left:

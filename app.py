@@ -165,4 +165,22 @@ with col_right:
         st.write("**Liquidity Summary:** Treasury is shifting more issuance into 10-year and 30-year 'Coupons.' This drains reserves.")
         st.info("Strategy: Monitor the 'Bill Share' of debt. A drop in T-Bill issuance relative to Coupons usually precedes a dip in stock market volatility.")
 
+st.divider()
+
+# --- NEW: GEOPOLITICAL HEADWINDS & TAILWINDS ---
+st.subheader("🌍 Geopolitical Intelligence Agent")
+geo_left, geo_right = st.columns(2)
+
+with geo_left:
+    st.write("**🔴 Geopolitical Headwinds**")
+    st.write("- **Trade Friction:** Increasing tariffs and export controls on high-end semiconductors.")
+    st.write("- **Energy Stability:** Escalating tensions in key maritime corridors impacting oil delivery cost.")
+    st.write("- **Asset Impact:** 🔴 Bearish for Emerging Markets, Global Logistics, and Consumer Tech.")
+
+with geo_right:
+    st.write("**🟢 Geopolitical Tailwinds**")
+    st.write("- **Near-Shoring:** Accelerating industrial capital expenditure in the Western Hemisphere pivot.")
+    st.write("- **Defense Modernization:** Multi-year budget expansion for re-armament and cybersecurity.")
+    st.write("- **Asset Impact:** 🟢 Bullish for Defense Stocks, Cybersecurity, Gold, and Domestic Industrials.")
+
 st.caption(f"Last Agent Update: {datetime.now().strftime('%Y-%m-%d %H:%M')} | Data Source: [Yahoo Finance](https://finance.yahoo.com)")

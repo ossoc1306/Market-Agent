@@ -50,7 +50,6 @@ def get_sector_leaderboard():
     tickers = list(sectors.keys())
     try:
         data = yf.download(tickers, period="2mo", progress=False)['Close']
-        # Calculate Returns
         daily = ((data.iloc[-1] / data.iloc[-2]) - 1) * 100
         weekly = ((data.iloc[-1] / data.iloc[-6]) - 1) * 100
         monthly = ((data.iloc[-1] / data.iloc[-21]) - 1) * 100
@@ -88,51 +87,4 @@ cols = st.columns(6)
 mom_val = ((spx_now/sma_200d)-1)*100 if sma_200d > 0 else 0
 mom_color = "🟢" if mom_val > 0 else "🔴"
 
-def show_pillar(col, label, status_text, subtext):
-    col.metric(label, status_text, subtext)
-
-show_pillar(cols[0], "Momentum", f"{mom_color} BULLISH", f"{mom_val:+.1f}% vs 200D")
-show_pillar(cols[1], "Inflation", "🟡 2.40%", "PCE Sticky at 3%")
-show_pillar(cols[2], "Growth", "🟡 1.40%", "Q4 Slowdown")
-show_pillar(cols[3], "Positioning", f"🟢 LITE", f"VIX {vix_now:.1f}")
-show_pillar(cols[4], "Monetary", "🟡 6.75%", "Prime Rate")
-show_pillar(cols[5], "Fiscal", "🔴 DEFICIT", "Duration Mix ↑")
-
-st.divider()
-
-# --- SECTOR LEADERBOARD ---
-st.subheader("📊 SPDR Sector Leaderboard (Top 5)")
-l_cols = st.columns(3)
-with l_cols[0]:
-    st.write("**Daily Leaders**")
-    for item in top_d: st.write(item)
-with l_cols[1]:
-    st.write("**Weekly Leaders**")
-    for item in top_w: st.write(item)
-with l_cols[2]:
-    st.write("**Monthly Leaders**")
-    for item in top_m: st.write(item)
-
-st.divider()
-
-# --- THE SUBSTANCE (DEEP DIVES) ---
-col_left, col_right = st.columns(2)
-
-with col_left:
-    with st.expander("🔍 Momentum & Trend Layers (SPX & QQQ)", expanded=True):
-        c1, c2 = st.columns(2)
-        with c1:
-            st.write("**S&P 500 (SPX)**")
-            st.write(f"Price: {spx_now:,.2f} | RSI-D: {spx_rsi_d:.1f}")
-        with c2:
-            st.write("**Nasdaq (QQQ)**")
-            st.write(f"Price: {qqq_now:,.2f} | RSI-D: {qqq_rsi_d:.1f}")
-        st.info("Analysis: Rotation into cyclical sectors often happens when Growth (QQQ) RSI gets overextended.")
-
-    with st.expander("₿ Crypto Intelligence Agent", expanded=True):
-        st.write(f"**Bitcoin Price:** ${btc_now:,.2f}")
-        btc_200ma = get_sma("BTC-USD", 200)
-        st.write(f"**Trend:** {'🟢 Bullish' if btc_now > btc_200ma else '🔴 Bearish'}")
-
-with col_right:
-    with st.expander("✨ Gold Intelligence Agent", expanded=True
+def show_pillar(col, label, status_

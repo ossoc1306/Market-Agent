@@ -9,8 +9,8 @@ st.title("🛡️ SPX Market Intelligence")
 st.subheader("Multi-Agent Regime Overlay")
 
 # --- LIVE DATA MINING ---
-# Tickers: ^GSPC (S&P), ^TNX (10yr), ^IRX (13-week Bill), ^VIX (Volatility), BTC-USD (Bitcoin)
-tickers = ["^GSPC", "^TNX", "^IRX", "^VIX", "BTC-USD"]
+# Tickers: ^GSPC (S&P), ^TNX (10yr), ^IRX (13-week Bill), ^VIX (Volatility), BTC-USD (Bitcoin), GC=F (Gold)
+tickers = ["^GSPC", "^TNX", "^IRX", "^VIX", "BTC-USD", "GC=F"]
 data = yf.download(tickers, period="2y", progress=False)
 
 # SPX Calculations
@@ -26,6 +26,9 @@ short_rate = data['Close']['^IRX'].iloc[-1]
 btc_price = data['Close']['BTC-USD'].iloc[-1]
 btc_200ma = data['Close']['BTC-USD'].rolling(window=200).mean().iloc[-1]
 btc_trend = "🟢 Bullish" if btc_price > btc_200ma else "🔴 Bearish"
+
+# Gold Calculations
+gold_price = data['Close']['GC=F'].iloc[-1]
 
 # --- THE SIMPLIFIED OVERLAY (The 6 Pillars) ---
 cols = st.columns(6)
@@ -63,19 +66,4 @@ with col_left:
         st.write(f"**Bitcoin Price:** ${btc_price:,.2f}")
         st.write(f"**BTC 200-Day Trend:** {btc_trend}")
         st.write(f"**Distance to 200MA:** {((btc_price/btc_200ma)-1)*100:+.2f}%")
-        st.info("Agent Logic: Bitcoin acts as a high-beta liquidity sensor. A breakout here often precedes broader market risk appetite.")
-
-with col_right:
-    with st.expander("🏦 Yield Curve & Interest Rates", expanded=True):
-        st.write(f"**US Prime Rate:** 6.75% (Effective Dec 2025)")
-        st.write(f"**10-Year Benchmark:** {ten_year:.2f}%")
-        st.write(f"**3-Month T-Bill:** {short_rate:.2f}%")
-        st.write(f"**10Y/3M Spread:** {ten_year - short_rate:.2f}%")
-        st.error("Risk: The yield curve remains inverted, which historically precedes a tightening of credit.")
-
-    with st.expander("📜 Fiscal Policy & Treasury Issuance", expanded=True):
-        st.write("**Recent QRA:** Treasury offering $125B in securities (Feb 2026).")
-        st.write("**Liquidity & Duration Summary:** Treasury is shifting more issuance into 10-year and 30-year 'Coupons.' This drains reserves and forces the market to absorb more 'Duration.'")
-        st.info("Strategy: A drop in T-Bill issuance relative to Coupons usually precedes a dip in stock market volatility.")
-
-st.caption(f"Last Agent Update: {datetime.now().strftime('%Y-%m-%d %H:%M')} | Data Source: [FRED](https://fred.stlouisfed.org) & [BLS](https://www.bls.gov)")
+        st.info("Agent Logic: Bitcoin acts as

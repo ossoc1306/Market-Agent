@@ -82,12 +82,12 @@ vxus_now = get_safe_data("VXUS")
 vix_now = get_safe_data("^VIX")
 tnx_now = get_safe_data("^TNX")
 short_rate = get_safe_data("^IRX")
+dxy_now = get_safe_data("DX-Y.NYB")
 btc_now = get_safe_data("BTC-USD")
 gold_now = get_safe_data("GC=F")
 
 # Indicators & Trend
 sma_200d = get_sma("^GSPC", 200)
-sma_40w = get_sma("^GSPC", 280)
 spx_rsi_d = calculate_rsi("^GSPC", "1d")
 spx_rsi_w = calculate_rsi("^GSPC", "1wk")
 qqq_200d = get_sma("QQQ", 200)
@@ -116,19 +116,14 @@ show_pillar(cols[5], "Fiscal", "🔴 DEFICIT", "Duration Mix ↑")
 
 st.divider()
 
-# --- VISUALIZATION ENHANCEMENTS: MARKET TEMPERATURE ---
+# --- MARKET TEMPERATURE ---
 st.subheader("🌡️ Market Temperature & Sentiment Gauge")
 avg_rsi = (spx_rsi_d + qqq_rsi_d + vxus_rsi_d) / 3
-if avg_rsi > 70:
-    status, color = "EXTREME GREED / OVERBOUGHT", "🔴"
-elif avg_rsi > 60:
-    status, color = "GREED", "🟠"
-elif avg_rsi < 30:
-    status, color = "EXTREME FEAR / OVERSOLD", "🔵"
-elif avg_rsi < 40:
-    status, color = "FEAR", "🟡"
-else:
-    status, color = "NEUTRAL", "🟢"
+if avg_rsi > 70: status, color = "EXTREME GREED / OVERBOUGHT", "🔴"
+elif avg_rsi > 60: status, color = "GREED", "🟠"
+elif avg_rsi < 30: status, color = "EXTREME FEAR / OVERSOLD", "🔵"
+elif avg_rsi < 40: status, color = "FEAR", "🟡"
+else: status, color = "NEUTRAL", "🟢"
 
 st.markdown(f"### {color} Current Regime: **{status}** (Avg RSI: {avg_rsi:.1f})")
 st.info("The Sentiment Gauge averages the Daily RSI of SPX, QQQ, and VXUS to identify broad exhaustion or capitulation.")
@@ -158,6 +153,7 @@ st.divider()
 
 # --- THE SUBSTANCE (DEEP DIVES) ---
 col_left, col_right = st.columns(2)
+
 with col_left:
     with st.expander("🔍 Momentum & Trend Layers (SPX, QQQ, VXUS)", expanded=True):
         c1, c2, c3 = st.columns(3)
@@ -165,48 +161,44 @@ with col_left:
             st.write("**S&P 500 (SPX)**")
             st.write(f"Price: {spx_now:,.2f}")
             st.write(f"Daily RSI: {spx_rsi_d:.1f} | Weekly: {spx_rsi_w:.1f}")
-            st.write(f"200-MA: {sma_200d:,.2f}")
         with c2:
             st.write("**Nasdaq (QQQ)**")
             st.write(f"Price: {qqq_now:,.2f}")
             st.write(f"Daily RSI: {qqq_rsi_d:.1f} | Weekly: {qqq_rsi_w:.1f}")
-            st.write(f"200-MA: {qqq_200d:,.2f}")
         with c3:
             st.write("**International (VXUS)**")
             st.write(f"Price: {vxus_now:,.2f}")
             st.write(f"Daily RSI: {vxus_rsi_d:.1f} | Weekly: {vxus_rsi_w:.1f}")
-            st.write(f"200-MA: {vxus_200d:,.2f}")
-        st.info("Agent Logic: Primary trend is UP as long as we hold the 40-week line. RSI > 70 (Overbought) or < 30 (Oversold).")
+        st.info("Agent Logic: Primary trend is UP as long as we hold the 40-week line. Divergence signals internal rotation.")
 
     with st.expander("📊 Inflation & Growth Dynamics", expanded=True):
-        st.write("**Core PCE:** 3.0% YoY (Still above Fed target)")
-        st.write("**GDP Growth:** 1.4% (Q4 Advance Estimate)")
-        st.warning("Analysis: The 'Soft Landing' is being tested as growth cools to 1.4% while core inflation remains at 3%. Watch for 'Stagflation' signals.")
+        st.write("**Core PCE:** 3.0% YoY | **GDP Growth:** 1.4% (Q4)")
+        st.warning("Analysis: Watch for 'Stagflation' signals as growth cools while PCE remains sticky.")
 
     with st.expander("₿ Crypto Intelligence Agent", expanded=True):
         st.write(f"**Bitcoin Price:** ${btc_now:,.2f}")
         btc_200ma = get_sma("BTC-USD", 200)
-        btc_trend = "🟢 Bullish" if btc_now > btc_200ma else "🔴 Bearish"
-        st.write(f"**BTC Trend:** {btc_trend}")
-        st.info("Analysis: BTC acts as a sensor for global dollar liquidity. Strength here often precedes broader market risk appetite.")
+        st.write(f"**BTC Trend:** {'🟢 Bullish' if btc_now > btc_200ma else '🔴 Bearish'}")
+        st.info("Analysis: BTC acts as a sensor for global dollar liquidity.")
 
 with col_right:
+    with st.expander("🌊 Liquidity Watch Agent (US & Global)", expanded=True):
+        st.write(f"**Dollar Index (DXY):** {dxy_now:.2f}")
+        st.write("**US Net Liquidity Logic:** Fed Balance Sheet - (TGA + RRP)")
+        st.info("Macro Note: Rising DXY usually acts as a 'Liquidity Vacuum,' pulling dollars out of risk assets like Tech and Crypto.")
+        st.write("**Global M2 Trend:** Expansionary bias from central bank pivots.")
+
     with st.expander("✨ Gold Intelligence Agent", expanded=True):
         st.write(f"**Current Gold Price:** ${gold_now:,.2f}")
         st.write(f"**Gold/SPX Ratio:** {gold_now/spx_now if spx_now > 0 else 0:.4f}")
-        st.info("Agent Logic: Gold acts as the ultimate safe-haven. Strength here often signals a hedge against currency debasement or geopolitical risk.")
 
     with st.expander("🏦 Yield Curve & Interest Rates", expanded=True):
-        st.write(f"**US Prime Rate:** 6.75% (Effective Dec 2025)")
-        st.write(f"**10-Year Benchmark:** {tnx_now:.2f}%")
-        st.write(f"**3-Month T-Bill:** {short_rate:.2f}%")
+        st.write(f"**10-Year Benchmark:** {tnx_now:.2f}% | **3-Month T-Bill:** {short_rate:.2f}%")
         st.write(f"**10Y/3M Spread:** {tnx_now - short_rate:.2f}%")
-        st.error("Risk: The inverted curve historically precedes a tightening of credit and lower equity multiples.")
 
     with st.expander("📜 Fiscal Policy & Treasury Issuance", expanded=True):
-        st.write("**Recent QRA:** Treasury offering $125B in securities (Feb 2026).")
-        st.write("**Liquidity Summary:** Treasury is shifting more issuance into 10-year and 30-year 'Coupons.' This drains reserves.")
-        st.info("Strategy: Monitor the 'Bill Share' of debt. A drop in T-Bill issuance relative to Coupons usually precedes a dip in stock market volatility.")
+        st.write("**Recent QRA:** Treasury offering $125B (Feb 2026).")
+        st.write("**Liquidity Summary:** Treasury shifting to 'Coupons' (Liquidity Drain).")
 
 st.divider()
 
@@ -215,13 +207,11 @@ st.subheader("🌍 Geopolitical Intelligence Agent")
 geo_left, geo_right = st.columns(2)
 with geo_left:
     st.write("**🔴 Geopolitical Headwinds**")
-    st.write("- **Trade Friction:** Increasing tariffs and export controls on high-end semiconductors.")
-    st.write("- **Energy Stability:** Escalating tensions in key maritime corridors impacting oil delivery cost.")
-    st.write("- **Asset Impact:** 🔴 Bearish for Emerging Markets, Global Logistics, and Consumer Tech.")
+    st.write("- **Trade Friction:** Increasing tariffs on high-end semiconductors.")
+    st.write("- **Energy Stability:** Escalating tensions in key maritime corridors.")
 with geo_right:
     st.write("**🟢 Geopolitical Tailwinds**")
-    st.write("- **Near-Shoring:** Accelerating industrial capital expenditure in the Western Hemisphere pivot.")
-    st.write("- **Defense Modernization:** Multi-year budget expansion for re-armament and cybersecurity.")
-    st.write("- **Asset Impact:** 🟢 Bullish for Defense Stocks, Cybersecurity, Gold, and Domestic Industrials.")
+    st.write("- **Near-Shoring:** Industrial CapEx in the Western Hemisphere pivot.")
+    st.write("- **Defense Modernization:** Multi-year budget expansion for re-armament.")
 
 st.caption(f"Last Agent Update: {datetime.now().strftime('%Y-%m-%d %H:%M')} | Data Source: [Yahoo Finance](https://finance.yahoo.com)")

@@ -92,9 +92,7 @@ btc_200ma = get_sma("BTC-USD", 200)
 spx_rsi_d = calculate_rsi("^GSPC")
 spx_rsi_w = calculate_rsi("^GSPC", "1wk")
 qqq_rsi_d = calculate_rsi("QQQ")
-qqq_rsi_w = calculate_rsi("QQQ", "1wk")
 vxus_rsi_d = calculate_rsi("VXUS")
-vxus_rsi_w = calculate_rsi("VXUS", "1wk")
 avg_rsi = (spx_rsi_d + qqq_rsi_d + vxus_rsi_d) / 3
 
 # --- 6 PILLARS OVERLAY ---
@@ -118,7 +116,6 @@ def get_rating(green_cond, red_cond):
     if red_cond: return "🔴 BEARISH"
     return "🟡 NEUTRAL"
 
-# Logical Definitions for Scorecard
 stocks_rating = get_rating(spx_now > sma_200d and avg_rsi < 65, spx_now < sma_200d or avg_rsi > 75)
 crypto_rating = get_rating(btc_now > btc_200ma and dxy_now < 105, btc_now < btc_200ma or dxy_now > 107)
 gold_rating = get_rating(gold_now/spx_now > 0.7 or avg_rsi < 45, dxy_now > 108)
@@ -142,7 +139,6 @@ elif avg_rsi < 40: status, color = "FEAR", "🟡"
 else: status, color = "NEUTRAL", "🟢"
 
 st.markdown(f"### {color} Current Regime: **{status}** (Avg RSI: {avg_rsi:.1f})")
-st.info("The Sentiment Gauge averages the Daily RSI of SPX, QQQ, and VXUS to identify broad exhaustion or capitulation.")
 
 st.divider()
 
@@ -181,13 +177,11 @@ with col_left:
         with c2:
             st.write("**Nasdaq (QQQ)**")
             st.write(f"Price: {qqq_now:,.2f}")
-            st.write(f"Daily RSI: {qqq_rsi_d:.1f} | Weekly: {qqq_rsi_w:.1f}")
-            st.write(f"200-MA: {get_sma('QQQ', 200):,.2f}")
+            st.write(f"Daily RSI: {qqq_rsi_d:.1f} | Weekly: {calculate_rsi('QQQ', '1wk'):.1f}")
         with c3:
             st.write("**International (VXUS)**")
             st.write(f"Price: {vxus_now:,.2f}")
-            st.write(f"Daily RSI: {vxus_rsi_d:.1f} | Weekly: {vxus_rsi_w:.1f}")
-            st.write(f"200-MA: {get_sma('VXUS', 200):,.2f}")
+            st.write(f"Daily RSI: {vxus_rsi_d:.1f} | Weekly: {calculate_rsi('VXUS', '1wk'):.1f}")
         st.info("Agent Logic: Primary trend is UP as long as we hold the 40-week line.")
 
     with st.expander("📊 Inflation & Growth Dynamics", expanded=True):
@@ -221,16 +215,18 @@ with col_right:
 
 st.divider()
 
-# --- GEOPOLITICAL INTELLIGENCE ---
+# --- GEOPOLITICAL INTELLIGENCE (FULLY RESTORED) ---
 st.subheader("🌍 Geopolitical Intelligence Agent")
 geo_left, geo_right = st.columns(2)
 with geo_left:
     st.write("**🔴 Geopolitical Headwinds**")
-    st.write("- **Trade Friction:** Increasing tariffs on high-end semiconductors.")
-    st.write("- **Energy Stability:** Escalating tensions in key maritime corridors.")
+    st.write("- **Trade Friction:** Increasing tariffs and export controls on high-end semiconductors.")
+    st.write("- **Energy Stability:** Escalating tensions in key maritime corridors impacting oil delivery cost.")
+    st.write("- **Asset Impact:** 🔴 Bearish for Emerging Markets, Global Logistics, and Consumer Tech.")
 with geo_right:
     st.write("**🟢 Geopolitical Tailwinds**")
-    st.write("- **Near-Shoring:** Accelerating CapEx in Western Hemisphere.")
-    st.write("- **Defense Modernization:** Multi-year budget expansion.")
+    st.write("- **Near-Shoring:** Accelerating industrial capital expenditure in the Western Hemisphere pivot.")
+    st.write("- **Defense Modernization:** Multi-year budget expansion for re-armament and cybersecurity.")
+    st.write("- **Asset Impact:** 🟢 Bullish for Defense Stocks, Cybersecurity, Gold, and Domestic Industrials.")
 
 st.caption(f"Last Agent Update: {datetime.now().strftime('%Y-%m-%d %H:%M')} | Data Source: [Yahoo Finance](https://finance.yahoo.com)")

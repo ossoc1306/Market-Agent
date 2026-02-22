@@ -9,8 +9,8 @@ st.title("🛡️ SPX Market Intelligence")
 st.subheader("Multi-Agent Regime Overlay")
 
 # --- LIVE DATA MINING ---
-# Tickers: ^GSPC (S&P), ^TNX (10yr), ^IRX (13-week Bill), ^VIX (Volatility), BTC-USD (Bitcoin)
-tickers = ["^GSPC", "^TNX", "^IRX", "^VIX", "BTC-USD"]
+# Tickers: ^GSPC (S&P), ^TNX (10yr), ^IRX (13-week Bill), ^VIX (Volatility), BTC-USD (Bitcoin), GC=F (Gold)
+tickers = ["^GSPC", "^TNX", "^IRX", "^VIX", "BTC-USD", "GC=F"]
 data = yf.download(tickers, period="2y", progress=False)
 
 # SPX Calculations
@@ -26,6 +26,9 @@ short_rate = data['Close']['^IRX'].iloc[-1]
 btc_price = data['Close']['BTC-USD'].iloc[-1]
 btc_200ma = data['Close']['BTC-USD'].rolling(window=200).mean().iloc[-1]
 btc_trend = "🟢 Bullish" if btc_price > btc_200ma else "🔴 Bearish"
+
+# Gold Calculations
+gold_price = data['Close']['GC=F'].iloc[-1]
 
 # --- THE SIMPLIFIED OVERLAY (The 6 Pillars) ---
 cols = st.columns(6)
@@ -66,6 +69,11 @@ with col_left:
         st.info("Agent Logic: Bitcoin acts as a high-beta liquidity sensor. A breakout here often precedes broader market risk appetite.")
 
 with col_right:
+    with st.expander("✨ Gold Intelligence Agent", expanded=True):
+        st.write(f"**Current Gold Price:** ${gold_price:,.2f}")
+        st.write(f"**Gold/SPX Ratio:** {(gold_price / spx_close):.4f}")
+        st.info("Agent Logic: Gold acts as the ultimate safe-haven and inflation hedge. Strength here often signals a hedge against currency debasement or geopolitical risk.")
+
     with st.expander("🏦 Yield Curve & Interest Rates", expanded=True):
         st.write(f"**US Prime Rate:** 6.75% (Effective Dec 2025)")
         st.write(f"**10-Year Benchmark:** {ten_year:.2f}%")
@@ -75,7 +83,6 @@ with col_right:
 
     with st.expander("📜 Fiscal Policy & Treasury Issuance", expanded=True):
         st.write("**Recent QRA:** Treasury offering $125B in securities (Feb 2026).")
-        st.write("**Liquidity & Duration Summary:** Treasury is shifting more issuance into 10-year and 30-year 'Coupons.' This drains reserves and forces the market to absorb more 'Duration.'")
-        st.info("Strategy: A drop in T-Bill issuance relative to Coupons usually precedes a dip in stock market volatility.")
+        st.write("**Liquidity & Duration Summary:** Treasury is shifting more issuance into 10-year and 30-year 'Coupons.' This drains reserves.")
 
 st.caption(f"Last Agent Update: {datetime.now().strftime('%Y-%m-%d %H:%M')} | Data Source: [FRED](https://fred.stlouisfed.org) & [BLS](https://www.bls.gov)")

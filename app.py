@@ -49,17 +49,11 @@ def get_sector_leaderboard():
     }
     tickers = list(sectors.keys())
     try:
-        # Fetch data for RSI and various timeframes
         data = yf.download(tickers, period="max", progress=False)['Close']
-        
-        # Calculate RSIs for all sectors
         sector_rsis = {t: calculate_rsi(t, "1d") for t in tickers}
-        
         daily = ((data.iloc[-1] / data.iloc[-2]) - 1) * 100
         weekly = ((data.iloc[-1] / data.iloc[-6]) - 1) * 100
         monthly = ((data.iloc[-1] / data.iloc[-21]) - 1) * 100
-        
-        # Calculate YTD
         current_year = datetime.now().year
         ytd_start = data[data.index >= f"{current_year}-01-01"].iloc[0]
         ytd = ((data.iloc[-1] / ytd_start) - 1) * 100
@@ -68,7 +62,6 @@ def get_sector_leaderboard():
             sorted_s = series.sort_values(ascending=False)
             top5 = sorted_s.head(5)
             bot5 = sorted_s.tail(5).sort_values(ascending=True)
-            
             t_list = [f"{sectors[t]}: {v:+.1f}% (RSI: {sector_rsis[t]:.1f})" for t, v in top5.items()]
             b_list = [f"{sectors[t]}: {v:+.1f}% (RSI: {sector_rsis[t]:.1f})" for t, v in bot5.items()]
             return t_list, b_list
@@ -77,11 +70,10 @@ def get_sector_leaderboard():
         w_t, w_b = get_ranks(weekly)
         m_t, m_b = get_ranks(monthly)
         y_t, y_b = get_ranks(ytd)
-        
-        return (d_t, d_b), (w_t, w_b), (m_t, m_b), (y_t, y_b)
+        return (d_t, d_b), (w_t, w_b), (m_t, m_b), (y_t, y_b), sector_rsis, sectors
     except:
         err = ["Data Pending"]*5
-        return (err, err), (err, err), (err, err), (err, err)
+        return (err, err), (err, err), (err, err), (err, err), {}, {}
 
 # Fetch Core Data
 spx_now = get_safe_data("^GSPC")
@@ -106,7 +98,7 @@ vxus_rsi_d = calculate_rsi("VXUS", "1d")
 vxus_rsi_w = calculate_rsi("VXUS", "1wk")
 
 # Leaderboard Data
-daily_data, weekly_data, monthly_data, ytd_data = get_sector_leaderboard()
+daily_data, weekly_data, monthly_data, ytd_data, s_rsis, s_names = get_sector_leaderboard()
 
 # --- THE 6 PILLARS OVERLAY ---
 cols = st.columns(6)
@@ -124,12 +116,37 @@ show_pillar(cols[5], "Fiscal", "🔴 DEFICIT", "Duration Mix ↑")
 
 st.divider()
 
-# --- SECTOR LEADERBOARD ---
-st.subheader("📊 SPDR Sector Performance & Rotation Agent")
+# --- VISUALIZATION ENHANCEMENTS: MARKET TEMPERATURE ---
+st.subheader("🌡️ Market Temperature & Sentiment Gauge")
+avg_rsi = (spx_rsi_d + qqq_rsi_d + vxus_rsi_d) / 3
+if avg_rsi > 70:
+    status, color = "EXTREME GREED / OVERBOUGHT", "🔴"
+elif avg_rsi > 60:
+    status, color = "GREED", "🟠"
+elif avg_rsi < 30:
+    status, color = "EXTREME FEAR / OVERSOLD", "🔵"
+elif avg_rsi < 40:
+    status, color = "FEAR", "🟡"
+else:
+    status, color = "NEUTRAL", "🟢"
+
+st.markdown(f"### {color} Current Regime: **{status}** (Avg RSI: {avg_rsi:.1f})")
+st.info("The Sentiment Gauge averages the Daily RSI of SPX, QQQ, and VXUS to identify broad exhaustion or capitulation.")
+
+st.divider()
+
+# --- SECTOR LEADERBOARD & RSI HEATMAP ---
+st.subheader("📊 Sector Performance & RSI Heatmap")
+if s_rsis:
+    heat_cols = st.columns(11)
+    for i, (t, r) in enumerate(s_rsis.items()):
+        c = "🔴" if r > 70 else ("🔵" if r < 30 else "⚪")
+        heat_cols[i].metric(s_names[t], f"{r:.0f}", c)
+    st.caption("RSI Heatmap Key: 🔴 Overbought (>70) | 🔵 Oversold (<30) | ⚪ Neutral")
+
+st.write("---")
 l_cols = st.columns(4)
-
 timeframes = [("Daily", daily_data), ("Weekly", weekly_data), ("Monthly", monthly_data), ("Year-to-Date", ytd_data)]
-
 for i, (name, data) in enumerate(timeframes):
     with l_cols[i]:
         st.write(f"**{name} Leaders**")
@@ -141,7 +158,6 @@ st.divider()
 
 # --- THE SUBSTANCE (DEEP DIVES) ---
 col_left, col_right = st.columns(2)
-
 with col_left:
     with st.expander("🔍 Momentum & Trend Layers (SPX, QQQ, VXUS)", expanded=True):
         c1, c2, c3 = st.columns(3)
@@ -160,7 +176,7 @@ with col_left:
             st.write(f"Price: {vxus_now:,.2f}")
             st.write(f"Daily RSI: {vxus_rsi_d:.1f} | Weekly: {vxus_rsi_w:.1f}")
             st.write(f"200-MA: {vxus_200d:,.2f}")
-        st.info("Agent Logic: Primary trend is UP as long as we hold the 40-week line. Divergence between SPX, QQQ, and VXUS RSI can signal internal rotation.")
+        st.info("Agent Logic: Primary trend is UP as long as we hold the 40-week line. RSI > 70 (Overbought) or < 30 (Oversold).")
 
     with st.expander("📊 Inflation & Growth Dynamics", expanded=True):
         st.write("**Core PCE:** 3.0% YoY (Still above Fed target)")

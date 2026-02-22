@@ -215,7 +215,7 @@ with col_right:
 
 st.divider()
 
-# --- GEOPOLITICAL INTELLIGENCE (FULLY RESTORED) ---
+# --- GEOPOLITICAL INTELLIGENCE AGENT ---
 st.subheader("🌍 Geopolitical Intelligence Agent")
 geo_left, geo_right = st.columns(2)
 with geo_left:

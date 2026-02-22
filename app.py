@@ -212,6 +212,7 @@ with col_right:
     with st.expander("📜 Fiscal Policy & Treasury Issuance", expanded=True):
         st.write("**Recent QRA:** Treasury offering $125B in securities (Feb 2026).")
         st.write("**Liquidity Summary:** Treasury shifting more issuance into 'Coupons.'")
+        st.info("**Analysis:** A shift from T-Bills to Coupons drains bank reserves. This usually increases equity volatility and puts upward pressure on term premiums.")
 
 st.divider()
 

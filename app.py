@@ -53,11 +53,9 @@ def get_sector_leaderboard():
         daily = ((data.iloc[-1] / data.iloc[-2]) - 1) * 100
         weekly = ((data.iloc[-1] / data.iloc[-6]) - 1) * 100
         monthly = ((data.iloc[-1] / data.iloc[-21]) - 1) * 100
-        
         def format_top5(series):
             top5 = series.sort_values(ascending=False).head(5)
             return [f"{sectors[t]}: {v:+.1f}%" for t, v in top5.items()]
-
         return format_top5(daily), format_top5(weekly), format_top5(monthly)
     except:
         return ["Data Pending"]*5, ["Data Pending"]*5, ["Data Pending"]*5
@@ -73,16 +71,10 @@ gold_now = get_safe_data("GC=F")
 
 # Indicators & Trend
 sma_200d = get_sma("^GSPC", 200)
-sma_40w = get_sma("^GSPC", 280)
 spx_rsi_d = calculate_rsi("^GSPC", "1d")
 spx_rsi_w = calculate_rsi("^GSPC", "1wk")
-
 qqq_200d = get_sma("QQQ", 200)
-qqq_40w = get_sma("QQQ", 280)
 qqq_rsi_d = calculate_rsi("QQQ", "1d")
-qqq_rsi_w = calculate_rsi("QQQ", "1wk")
-
-# Leaderboard Data
 top_d, top_w, top_m = get_sector_leaderboard()
 
 # --- THE 6 PILLARS OVERLAY ---
@@ -121,48 +113,46 @@ st.divider()
 col_left, col_right = st.columns(2)
 
 with col_left:
+    with st.expander("🌍 Geopolitical Risk Agent", expanded=True):
+        st.write("**Headline: Techno-Nationalism & Great Power Friction (2026)**")
+        st.write("Current Focus: US-China chip decoupling and Western Hemisphere intervention strategy.")
+        st.write("---")
+        st.write("**Impacted Assets:**")
+        st.write("🟢 **Bullish:** Gold (Safe Haven), Defense Stocks ( Rearmament), Cybersecurity (Gray Zone War)")
+        st.write("🔴 **Bearish:** Emerging Markets (Decoupling), Consumer Tech (Supply Shocks), Global Bonds (Inflation Risk)")
+        st.info("Agent Logic: In a 'Polycrisis' environment, gold independent of yields becomes the primary liquidity anchor.")
+
     with st.expander("🔍 Momentum & Trend Layers (SPX & QQQ)", expanded=True):
         c1, c2 = st.columns(2)
         with c1:
             st.write("**S&P 500 (SPX)**")
-            st.write(f"Price: {spx_now:,.2f}")
-            st.write(f"Daily RSI: {spx_rsi_d:.1f} | Weekly: {spx_rsi_w:.1f}")
-            st.write(f"200-MA: {sma_200d:,.2f}")
+            st.write(f"Price: {spx_now:,.2f} | RSI-D: {spx_rsi_d:.1f}")
         with c2:
             st.write("**Nasdaq (QQQ)**")
-            st.write(f"Price: {qqq_now:,.2f}")
-            st.write(f"Daily RSI: {qqq_rsi_d:.1f} | Weekly: {qqq_rsi_w:.1f}")
-            st.write(f"200-MA: {qqq_200d:,.2f}")
-        st.info("Agent Logic: Primary trend is UP as long as we hold the 40-week line. Divergence between SPX and QQQ RSI can signal internal rotation.")
-
-    with st.expander("📊 Inflation & Growth Dynamics", expanded=True):
-        st.write("**Core PCE:** 3.0% YoY (Still above Fed target)")
-        st.write("**GDP Growth:** 1.4% (Q4 Advance Estimate)")
-        st.warning("Analysis: The 'Soft Landing' is being tested as growth cools to 1.4% while core inflation remains at 3%. Watch for 'Stagflation' signals.")
+            st.write(f"Price: {qqq_now:,.2f} | RSI-D: {qqq_rsi_d:.1f}")
+        st.info("Trend Note: Primary trend remains UP while holding the 40-week line.")
 
     with st.expander("₿ Crypto Intelligence Agent", expanded=True):
         st.write(f"**Bitcoin Price:** ${btc_now:,.2f}")
         btc_200ma = get_sma("BTC-USD", 200)
-        btc_trend = "🟢 Bullish" if btc_now > btc_200ma else "🔴 Bearish"
-        st.write(f"**BTC Trend:** {btc_trend}")
-        st.info("Analysis: BTC acts as a sensor for global dollar liquidity. Strength here often precedes broader market risk appetite.")
+        st.write(f"**BTC Trend:** {'🟢 Bullish' if btc_now > btc_200ma else '🔴 Bearish'}")
 
 with col_right:
+    with st.expander("📊 Inflation & Growth Dynamics", expanded=True):
+        st.write("**Core PCE:** 3.0% YoY | **GDP:** 1.4% (Q4)")
+        st.warning("Analysis: Watch for 'Stagflation' signals if growth cools while PCE stays sticky.")
+
     with st.expander("✨ Gold Intelligence Agent", expanded=True):
         st.write(f"**Current Gold Price:** ${gold_now:,.2f}")
         st.write(f"**Gold/SPX Ratio:** {gold_now/spx_now if spx_now > 0 else 0:.4f}")
-        st.info("Agent Logic: Gold acts as the ultimate safe-haven. Strength here often signals a hedge against currency debasement or geopolitical risk.")
 
     with st.expander("🏦 Yield Curve & Interest Rates", expanded=True):
-        st.write(f"**US Prime Rate:** 6.75% (Effective Dec 2025)")
-        st.write(f"**10-Year Benchmark:** {tnx_now:.2f}%")
-        st.write(f"**3-Month T-Bill:** {short_rate:.2f}%")
+        st.write(f"**10Y Benchmark:** {tnx_now:.2f}% | **3M Bill:** {short_rate:.2f}%")
         st.write(f"**10Y/3M Spread:** {tnx_now - short_rate:.2f}%")
-        st.error("Risk: The inverted curve historically precedes a tightening of credit and lower equity multiples.")
 
     with st.expander("📜 Fiscal Policy & Treasury Issuance", expanded=True):
         st.write("**Recent QRA:** Treasury offering $125B in securities (Feb 2026).")
-        st.write("**Liquidity Summary:** Treasury is shifting more issuance into 10-year and 30-year 'Coupons.' This drains reserves.")
-        st.info("Strategy: Monitor the 'Bill Share' of debt. A drop in T-Bill issuance relative to Coupons usually precedes a dip in stock market volatility.")
+        st.write("**Liquidity Summary:** Treasury shifting to 'Coupons' (Liquidity Drain).")
+        st.info("Strategy: A drop in 'Bill Share' relative to Coupons usually precedes volatility spikes.")
 
 st.caption(f"Last Agent Update: {datetime.now().strftime('%Y-%m-%d %H:%M')} | Data Source: [Yahoo Finance](https://finance.yahoo.com)")

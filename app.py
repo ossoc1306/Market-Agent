@@ -65,6 +65,7 @@ def get_sector_leaderboard():
 # Fetch Core Data
 spx_now = get_safe_data("^GSPC")
 qqq_now = get_safe_data("QQQ")
+vxus_now = get_safe_data("VXUS")
 vix_now = get_safe_data("^VIX")
 tnx_now = get_safe_data("^TNX")
 short_rate = get_safe_data("^IRX")
@@ -78,9 +79,12 @@ spx_rsi_d = calculate_rsi("^GSPC", "1d")
 spx_rsi_w = calculate_rsi("^GSPC", "1wk")
 
 qqq_200d = get_sma("QQQ", 200)
-qqq_40w = get_sma("QQQ", 280)
 qqq_rsi_d = calculate_rsi("QQQ", "1d")
 qqq_rsi_w = calculate_rsi("QQQ", "1wk")
+
+vxus_200d = get_sma("VXUS", 200)
+vxus_rsi_d = calculate_rsi("VXUS", "1d")
+vxus_rsi_w = calculate_rsi("VXUS", "1wk")
 
 # Leaderboard Data
 top_d, top_w, top_m = get_sector_leaderboard()
@@ -121,8 +125,8 @@ st.divider()
 col_left, col_right = st.columns(2)
 
 with col_left:
-    with st.expander("🔍 Momentum & Trend Layers (SPX & QQQ)", expanded=True):
-        c1, c2 = st.columns(2)
+    with st.expander("🔍 Momentum & Trend Layers (SPX, QQQ, VXUS)", expanded=True):
+        c1, c2, c3 = st.columns(3)
         with c1:
             st.write("**S&P 500 (SPX)**")
             st.write(f"Price: {spx_now:,.2f}")
@@ -133,7 +137,12 @@ with col_left:
             st.write(f"Price: {qqq_now:,.2f}")
             st.write(f"Daily RSI: {qqq_rsi_d:.1f} | Weekly: {qqq_rsi_w:.1f}")
             st.write(f"200-MA: {qqq_200d:,.2f}")
-        st.info("Agent Logic: Primary trend is UP as long as we hold the 40-week line. Divergence between SPX and QQQ RSI can signal internal rotation.")
+        with c3:
+            st.write("**International (VXUS)**")
+            st.write(f"Price: {vxus_now:,.2f}")
+            st.write(f"Daily RSI: {vxus_rsi_d:.1f} | Weekly: {vxus_rsi_w:.1f}")
+            st.write(f"200-MA: {vxus_200d:,.2f}")
+        st.info("Agent Logic: Primary trend is UP as long as we hold the 40-week line. Divergence between SPX, QQQ, and VXUS RSI can signal internal rotation.")
 
     with st.expander("📊 Inflation & Growth Dynamics", expanded=True):
         st.write("**Core PCE:** 3.0% YoY (Still above Fed target)")

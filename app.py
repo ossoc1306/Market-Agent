@@ -68,23 +68,4 @@ qqq_now = get_safe_data("QQQ")
 vix_now = get_safe_data("^VIX")
 tnx_now = get_safe_data("^TNX")
 short_rate = get_safe_data("^IRX")
-btc_now = get_safe_data("BTC-USD")
-gold_now = get_safe_data("GC=F")
-
-# SPX & QQQ Indicators
-sma_200d = get_sma("^GSPC", 200)
-spx_rsi_d = calculate_rsi("^GSPC", "1d")
-spx_rsi_w = calculate_rsi("^GSPC", "1wk")
-qqq_200d = get_sma("QQQ", 200)
-qqq_rsi_d = calculate_rsi("QQQ", "1d")
-qqq_rsi_w = calculate_rsi("QQQ", "1wk")
-
-# Leaderboard Data
-top_d, top_w, top_m = get_sector_leaderboard()
-
-# --- THE 6 PILLARS OVERLAY ---
-cols = st.columns(6)
-mom_val = ((spx_now/sma_200d)-1)*100 if sma_200d > 0 else 0
-mom_color = "🟢" if mom_val > 0 else "🔴"
-
-def show_pillar(col, label, status_
+btc_now = get

@@ -66,4 +66,23 @@ with col_left:
         st.write(f"**Bitcoin Price:** ${btc_price:,.2f}")
         st.write(f"**BTC 200-Day Trend:** {btc_trend}")
         st.write(f"**Distance to 200MA:** {((btc_price/btc_200ma)-1)*100:+.2f}%")
-        st.info("Agent Logic: Bitcoin acts as
+        st.info("Agent Logic: Bitcoin acts as a high-beta liquidity sensor. A breakout here often precedes broader market risk appetite.")
+
+with col_right:
+    with st.expander("✨ Gold Intelligence Agent", expanded=True):
+        st.write(f"**Current Gold Price:** ${gold_price:,.2f}")
+        st.write(f"**Gold/SPX Ratio:** {(gold_price / spx_close):.4f}")
+        st.info("Agent Logic: Gold acts as the ultimate safe-haven and inflation hedge. Strength here often signals a hedge against currency debasement or geopolitical risk.")
+
+    with st.expander("🏦 Yield Curve & Interest Rates", expanded=True):
+        st.write(f"**US Prime Rate:** 6.75% (Effective Dec 2025)")
+        st.write(f"**10-Year Benchmark:** {ten_year:.2f}%")
+        st.write(f"**3-Month T-Bill:** {short_rate:.2f}%")
+        st.write(f"**10Y/3M Spread:** {ten_year - short_rate:.2f}%")
+        st.error("Risk: The yield curve remains inverted, which historically precedes a tightening of credit.")
+
+    with st.expander("📜 Fiscal Policy & Treasury Issuance", expanded=True):
+        st.write("**Recent QRA:** Treasury offering $125B in securities (Feb 2026).")
+        st.write("**Liquidity & Duration Summary:** Treasury is shifting more issuance into 10-year and 30-year 'Coupons.' This drains reserves.")
+
+st.caption(f"Last Agent Update: {datetime.now().strftime('%Y-%m-%d %H:%M')} | Data Source: [FRED](https://fred.stlouisfed.org) & [BLS](https://www.bls.gov)")

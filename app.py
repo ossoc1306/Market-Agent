@@ -4,10 +4,10 @@ import pandas as pd
 from datetime import datetime
 
 # PAGE CONFIG
-st.set_page_config(page_title="SPX Market Intelligence", layout="wide")
+st.set_page_config(page_title="Global Asset Intelligence", layout="wide")
 
-st.title("🛡️ SPX Market Intelligence")
-st.subheader("Multi-Agent Regime Overlay")
+st.title("🛡️ Global Asset Intelligence")
+st.subheader("Multi-Asset Overlay")
 
 # --- ROBUST DATA MINING FUNCTIONS ---
 def get_safe_data(ticker):

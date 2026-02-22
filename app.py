@@ -9,26 +9,15 @@ st.title("🛡️ SPX Market Intelligence")
 st.subheader("Multi-Agent Regime Overlay")
 
 # --- ROBUST DATA MINING FUNCTION ---
-def get_safe_data(ticker, label):
+def get_safe_data(ticker):
     try:
-        # Fetching a small window to ensure we get the latest valid close
         d = yf.download(ticker, period="5d", progress=False)
         if not d.empty:
-            # Get the last non-NaN value
             return d['Close'].dropna().iloc[-1].item()
         return 0.0
     except:
         return 0.0
 
-# Fetching individually to prevent cross-ticker NaN corruption
-spx_now = get_safe_data("^GSPC", "S&P 500")
-vix_now = get_safe_data("^VIX", "VIX")
-tnx_now = get_safe_data("^TNX", "10Y Yield")
-short_rate = get_safe_data("^IRX", "3M Bill")
-btc_now = get_safe_data("BTC-USD", "Bitcoin")
-gold_now = get_safe_data("GC=F", "Gold")
-
-# Calculate SMA for Trend (requires more data)
 def get_sma(ticker, window):
     try:
         d = yf.download(ticker, period="2y", progress=False)
@@ -36,27 +25,32 @@ def get_sma(ticker, window):
     except:
         return 0.0
 
+# Fetch Data
+spx_now = get_safe_data("^GSPC")
+vix_now = get_safe_data("^VIX")
+tnx_now = get_safe_data("^TNX")
+short_rate = get_safe_data("^IRX")
+btc_now = get_safe_data("BTC-USD")
+gold_now = get_safe_data("GC=F")
 sma_200d = get_sma("^GSPC", 200)
 sma_40w = get_sma("^GSPC", 280)
 
-# --- THE SIMPLIFIED OVERLAY (6 Pillars) ---
+# --- THE 6 PILLARS OVERLAY ---
 cols = st.columns(6)
 
-def show_metric(col, label, value, subtext, prefix="", suffix=""):
-    if value == 0 or value is None:
-        col.metric(label, "Data Pending", "🔄 Refreshing")
-    else:
-        col.metric(label, f"{prefix}{value:,.2f}{suffix}", subtext)
+# Logic for indicators
+mom_val = ((spx_now/sma_200d)-1)*100 if sma_200d > 0 else 0
+mom_color = "🟢" if mom_val > 0 else "🔴"
 
-# Logic for Momentum subtext
-mom_sub = f"{((spx_now/sma_200d)-1)*100:+.1f}% vs 200D" if sma_200d > 0 else "N/A"
+def show_pillar(col, label, status_text, subtext):
+    col.metric(label, status_text, subtext)
 
-show_metric(cols[0], "Momentum", spx_now, mom_sub)
-show_metric(cols[1], "Inflation", 2.40, "PCE Sticky at 3%", suffix="%")
-show_metric(cols[2], "Growth", 1.40, "Q4 Slowdown", suffix="%")
-show_metric(cols[3], "Positioning", vix_now, "VIX Index")
-show_metric(cols[4], "Monetary", 6.75, "Prime Rate", suffix="%")
-show_metric(cols[5], "Fiscal", 0.0, "Duration Mix ↑", prefix="🔴 DEFICIT")
+show_pillar(cols[0], "Momentum", f"{mom_color} BULLISH", f"{mom_val:+.1f}% vs 200D")
+show_pillar(cols[1], "Inflation", "🟡 2.40%", "PCE Sticky at 3%")
+show_pillar(cols[2], "Growth", "🟡 1.40%", "Q4 Slowdown")
+show_pillar(cols[3], "Positioning", f"🟢 LITE", f"VIX {vix_now:.1f}")
+show_pillar(cols[4], "Monetary", "🟡 6.75%", "Prime Rate")
+show_pillar(cols[5], "Fiscal", "🔴 DEFICIT", "Duration Mix ↑")
 
 st.divider()
 
@@ -72,7 +66,9 @@ with col_left:
 
     with st.expander("₿ Crypto Intelligence Agent", expanded=True):
         st.write(f"**Bitcoin Price:** ${btc_now:,.2f}")
-        st.write(f"**BTC Trend:** {'🟢 Bullish' if btc_now > 0 else '🔴 Data Error'}")
+        btc_200ma = get_sma("BTC-USD", 200)
+        btc_trend = "🟢 Bullish" if btc_now > btc_200ma else "🔴 Bearish"
+        st.write(f"**BTC Trend:** {btc_trend}")
         st.info("Analysis: BTC acts as a sensor for global dollar liquidity.")
 
 with col_right:
@@ -86,4 +82,9 @@ with col_right:
         st.write(f"**3-Month T-Bill:** {short_rate:.2f}%")
         st.error("Risk: The inverted curve historically precedes credit tightening.")
 
-st.caption(f"Last Agent Update: {datetime.now().strftime('%Y-%m-%d %H:%M')} | Data Source: [Yahoo Finance](https://finance.yahoo.com)")
+    with st.expander("📜 Fiscal Policy & Treasury Issuance", expanded=True):
+        st.write("**Recent QRA:** Treasury offering $125B in securities (Feb 2026).")
+        st.write("**Liquidity & Duration Summary:** Treasury is shifting more issuance into 10-year and 30-year 'Coupons.' This drains reserves.")
+        st.info("Strategy: A drop in T-Bill issuance relative to Coupons usually precedes a dip in stock market volatility.")
+
+st.caption(f"Last Agent Update: {datetime.now().strftime('%Y-%m-%d %H:%M')} | Data Source: Yahoo Finance")

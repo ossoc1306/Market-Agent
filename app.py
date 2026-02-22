@@ -50,17 +50,31 @@ def get_sector_leaderboard():
     tickers = list(sectors.keys())
     try:
         data = yf.download(tickers, period="2mo", progress=False)['Close']
+        
+        # Calculate RSIs for all sectors
+        sector_rsis = {t: calculate_rsi(t, "1d") for t in tickers}
+        
         daily = ((data.iloc[-1] / data.iloc[-2]) - 1) * 100
         weekly = ((data.iloc[-1] / data.iloc[-6]) - 1) * 100
         monthly = ((data.iloc[-1] / data.iloc[-21]) - 1) * 100
         
-        def format_top5(series):
-            top5 = series.sort_values(ascending=False).head(5)
-            return [f"{sectors[t]}: {v:+.1f}%" for t, v in top5.items()]
+        def get_ranks(series):
+            sorted_s = series.sort_values(ascending=False)
+            top5 = sorted_s.head(5)
+            bot5 = sorted_s.tail(5).sort_values(ascending=True) # Worst first
+            
+            t_list = [f"{sectors[t]}: {v:+.1f}% (RSI: {sector_rsis[t]:.1f})" for t, v in top5.items()]
+            b_list = [f"{sectors[t]}: {v:+.1f}% (RSI: {sector_rsis[t]:.1f})" for t, v in bot5.items()]
+            return t_list, b_list
 
-        return format_top5(daily), format_top5(weekly), format_top5(monthly)
+        d_t, d_b = get_ranks(daily)
+        w_t, w_b = get_ranks(weekly)
+        m_t, m_b = get_ranks(monthly)
+        
+        return (d_t, d_b), (w_t, w_b), (m_t, m_b)
     except:
-        return ["Data Pending"]*5, ["Data Pending"]*5, ["Data Pending"]*5
+        err = ["Data Pending"]*5
+        return (err, err), (err, err), (err, err)
 
 # Fetch Core Data
 spx_now = get_safe_data("^GSPC")
@@ -77,23 +91,20 @@ sma_200d = get_sma("^GSPC", 200)
 sma_40w = get_sma("^GSPC", 280)
 spx_rsi_d = calculate_rsi("^GSPC", "1d")
 spx_rsi_w = calculate_rsi("^GSPC", "1wk")
-
 qqq_200d = get_sma("QQQ", 200)
 qqq_rsi_d = calculate_rsi("QQQ", "1d")
 qqq_rsi_w = calculate_rsi("QQQ", "1wk")
-
 vxus_200d = get_sma("VXUS", 200)
 vxus_rsi_d = calculate_rsi("VXUS", "1d")
 vxus_rsi_w = calculate_rsi("VXUS", "1wk")
 
 # Leaderboard Data
-top_d, top_w, top_m = get_sector_leaderboard()
+daily_data, weekly_data, monthly_data = get_sector_leaderboard()
 
 # --- THE 6 PILLARS OVERLAY ---
 cols = st.columns(6)
 mom_val = ((spx_now/sma_200d)-1)*100 if sma_200d > 0 else 0
 mom_color = "🟢" if mom_val > 0 else "🔴"
-
 def show_pillar(col, label, status_text, subtext):
     col.metric(label, status_text, subtext)
 
@@ -107,17 +118,17 @@ show_pillar(cols[5], "Fiscal", "🔴 DEFICIT", "Duration Mix ↑")
 st.divider()
 
 # --- SECTOR LEADERBOARD ---
-st.subheader("📊 SPDR Sector Leaderboard (Top 5)")
+st.subheader("📊 SPDR Sector Performance & Rotation Agent")
 l_cols = st.columns(3)
-with l_cols[0]:
-    st.write("**Daily Leaders**")
-    for item in top_d: st.write(item)
-with l_cols[1]:
-    st.write("**Weekly Leaders**")
-    for item in top_w: st.write(item)
-with l_cols[2]:
-    st.write("**Monthly Leaders**")
-    for item in top_m: st.write(item)
+
+timeframes = [("Daily", daily_data), ("Weekly", weekly_data), ("Monthly", monthly_data)]
+
+for i, (name, data) in enumerate(timeframes):
+    with l_cols[i]:
+        st.write(f"**{name} Leaders (Top 5)**")
+        for item in data[0]: st.write(f"🟢 {item}")
+        st.write(f"**{name} Laggards (Bottom 5)**")
+        for item in data[1]: st.write(f"🔴 {item}")
 
 st.divider()
 
@@ -176,16 +187,14 @@ with col_right:
 
 st.divider()
 
-# --- NEW: GEOPOLITICAL HEADWINDS & TAILWINDS ---
+# --- GEOPOLITICAL HEADWINDS & TAILWINDS ---
 st.subheader("🌍 Geopolitical Intelligence Agent")
 geo_left, geo_right = st.columns(2)
-
 with geo_left:
     st.write("**🔴 Geopolitical Headwinds**")
     st.write("- **Trade Friction:** Increasing tariffs and export controls on high-end semiconductors.")
     st.write("- **Energy Stability:** Escalating tensions in key maritime corridors impacting oil delivery cost.")
     st.write("- **Asset Impact:** 🔴 Bearish for Emerging Markets, Global Logistics, and Consumer Tech.")
-
 with geo_right:
     st.write("**🟢 Geopolitical Tailwinds**")
     st.write("- **Near-Shoring:** Accelerating industrial capital expenditure in the Western Hemisphere pivot.")

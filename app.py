@@ -49,7 +49,8 @@ def get_sector_leaderboard():
     }
     tickers = list(sectors.keys())
     try:
-        data = yf.download(tickers, period="2mo", progress=False)['Close']
+        # Fetch data for RSI and various timeframes
+        data = yf.download(tickers, period="max", progress=False)['Close']
         
         # Calculate RSIs for all sectors
         sector_rsis = {t: calculate_rsi(t, "1d") for t in tickers}
@@ -58,10 +59,15 @@ def get_sector_leaderboard():
         weekly = ((data.iloc[-1] / data.iloc[-6]) - 1) * 100
         monthly = ((data.iloc[-1] / data.iloc[-21]) - 1) * 100
         
+        # Calculate YTD
+        current_year = datetime.now().year
+        ytd_start = data[data.index >= f"{current_year}-01-01"].iloc[0]
+        ytd = ((data.iloc[-1] / ytd_start) - 1) * 100
+        
         def get_ranks(series):
             sorted_s = series.sort_values(ascending=False)
             top5 = sorted_s.head(5)
-            bot5 = sorted_s.tail(5).sort_values(ascending=True) # Worst first
+            bot5 = sorted_s.tail(5).sort_values(ascending=True)
             
             t_list = [f"{sectors[t]}: {v:+.1f}% (RSI: {sector_rsis[t]:.1f})" for t, v in top5.items()]
             b_list = [f"{sectors[t]}: {v:+.1f}% (RSI: {sector_rsis[t]:.1f})" for t, v in bot5.items()]
@@ -70,11 +76,12 @@ def get_sector_leaderboard():
         d_t, d_b = get_ranks(daily)
         w_t, w_b = get_ranks(weekly)
         m_t, m_b = get_ranks(monthly)
+        y_t, y_b = get_ranks(ytd)
         
-        return (d_t, d_b), (w_t, w_b), (m_t, m_b)
+        return (d_t, d_b), (w_t, w_b), (m_t, m_b), (y_t, y_b)
     except:
         err = ["Data Pending"]*5
-        return (err, err), (err, err), (err, err)
+        return (err, err), (err, err), (err, err), (err, err)
 
 # Fetch Core Data
 spx_now = get_safe_data("^GSPC")
@@ -99,7 +106,7 @@ vxus_rsi_d = calculate_rsi("VXUS", "1d")
 vxus_rsi_w = calculate_rsi("VXUS", "1wk")
 
 # Leaderboard Data
-daily_data, weekly_data, monthly_data = get_sector_leaderboard()
+daily_data, weekly_data, monthly_data, ytd_data = get_sector_leaderboard()
 
 # --- THE 6 PILLARS OVERLAY ---
 cols = st.columns(6)
@@ -119,15 +126,15 @@ st.divider()
 
 # --- SECTOR LEADERBOARD ---
 st.subheader("📊 SPDR Sector Performance & Rotation Agent")
-l_cols = st.columns(3)
+l_cols = st.columns(4)
 
-timeframes = [("Daily", daily_data), ("Weekly", weekly_data), ("Monthly", monthly_data)]
+timeframes = [("Daily", daily_data), ("Weekly", weekly_data), ("Monthly", monthly_data), ("Year-to-Date", ytd_data)]
 
 for i, (name, data) in enumerate(timeframes):
     with l_cols[i]:
-        st.write(f"**{name} Leaders (Top 5)**")
+        st.write(f"**{name} Leaders**")
         for item in data[0]: st.write(f"🟢 {item}")
-        st.write(f"**{name} Laggards (Bottom 5)**")
+        st.write(f"**{name} Laggards**")
         for item in data[1]: st.write(f"🔴 {item}")
 
 st.divider()

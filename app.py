@@ -8,19 +8,24 @@ st.set_page_config(page_title="SPX Market Intelligence", layout="wide")
 st.title("🛡️ SPX Market Intelligence")
 st.subheader("Multi-Agent Regime Overlay")
 
-# --- LIVE DATA MINING (Momentum & Yields) ---
-# Tickers: ^SPX (S&P), ^TNX (10yr), ^IRX (13-week Bill), ^VIX (Volatility)
-data = yf.download(["^SPX", "^TNX", "^IRX", "^VIX"], period="2y", progress=False)
+# --- LIVE DATA MINING ---
+# Tickers: ^GSPC (S&P), ^TNX (10yr), ^IRX (13-week Bill), ^VIX (Volatility), BTC-USD (Bitcoin)
+tickers = ["^GSPC", "^TNX", "^IRX", "^VIX", "BTC-USD"]
+data = yf.download(tickers, period="2y", progress=False)
 
-# Calculations
-spx_close = data['Close']['^SPX'].iloc[-1]
-sma_200d = data['Close']['^SPX'].rolling(window=200).mean().iloc[-1]
-sma_40w = data['Close']['^SPX'].rolling(window=280).mean().iloc[-1] 
+# SPX Calculations
+spx_close = data['Close']['^GSPC'].iloc[-1]
+sma_200d = data['Close']['^GSPC'].rolling(window=200).mean().iloc[-1]
+sma_40w = data['Close']['^GSPC'].rolling(window=280).mean().iloc[-1] 
 
-# Interest Rate Data (Live-ish)
+# Interest Rate Data
 ten_year = data['Close']['^TNX'].iloc[-1]
-# Note: Using ^IRX (3-month bill) as a proxy for the 'short-end' to avoid ticker bugs
 short_rate = data['Close']['^IRX'].iloc[-1] 
+
+# Bitcoin Calculations
+btc_price = data['Close']['BTC-USD'].iloc[-1]
+btc_200ma = data['Close']['BTC-USD'].rolling(window=200).mean().iloc[-1]
+btc_trend = "🟢 Bullish" if btc_price > btc_200ma else "🔴 Bearish"
 
 # --- THE SIMPLIFIED OVERLAY (The 6 Pillars) ---
 cols = st.columns(6)
@@ -50,21 +55,17 @@ with col_left:
 
     with st.expander("📊 Inflation & Growth Dynamics", expanded=True):
         st.write("**Headline CPI:** 2.4% (January 2026 Print)")
-        st.write("**Core PCE:** 3.0% YoY (Still above Fed target)")
+        st.write("**Core PCE:** 3.0% YoY")
         st.write("**GDP Growth:** 1.4% (Q4 Advance Estimate)")
-        st.warning("Analysis: The 'Soft Landing' is being tested as growth cools to 1.4% while core inflation remains at 3%. Watch for 'Stagflation' signals.")
+        st.warning("Analysis: Core inflation remains at 3%. Watch for 'Stagflation' signals if growth slows further.")
+
+    with st.expander("₿ Crypto Intelligence Agent", expanded=True):
+        st.write(f"**Bitcoin Price:** ${btc_price:,.2f}")
+        st.write(f"**BTC 200-Day Trend:** {btc_trend}")
+        st.write(f"**Distance to 200MA:** {((btc_price/btc_200ma)-1)*100:+.2f}%")
+        st.info("Agent Logic: Bitcoin acts as a high-beta liquidity sensor. A breakout here often precedes broader market risk appetite.")
 
 with col_right:
     with st.expander("🏦 Yield Curve & Interest Rates", expanded=True):
         st.write(f"**US Prime Rate:** 6.75% (Effective Dec 2025)")
-        st.write(f"**10-Year Benchmark:** {ten_year:.2f}%")
-        st.write(f"**3-Month T-Bill:** {short_rate:.2f}%")
-        st.write(f"**10Y/3M Spread:** {ten_year - short_rate:.2f}%")
-        st.error("Risk: The yield curve remains inverted, which historically precedes a tightening of credit and lower equity multiples.")
-
-    with st.expander("📜 Fiscal Policy & Treasury Issuance", expanded=True):
-        st.write("**Recent QRA:** Treasury offering $125B in securities (Feb 2026).")
-        st.write("**Liquidity & Duration Summary:** Treasury is shifting more issuance into 10-year and 30-year 'Coupons.' This drains reserves and forces the market to absorb more 'Duration,' which is a headwind for S&P 500 liquidity.")
-        st.info("Strategy: Monitor the 'Bill Share' of debt. A drop in T-Bill issuance usually precedes a dip in stock market volatility.")
-
-st.caption(f"Last Agent Update: {datetime.now().strftime('%Y-%m-%d %H:%M')} | Data Source: [FRED](https://fred.stlouisfed.org) & [BLS](https://www.bls.gov)")
+        st.write(f"**10-Year Benchmark:** {ten

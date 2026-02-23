@@ -1,6 +1,7 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
+import feedparser
 from datetime import datetime
 
 # PAGE CONFIG
@@ -39,6 +40,13 @@ def get_sma(ticker, window):
         return d['Close'].rolling(window=window).mean().iloc[-1].item()
     except:
         return 0.0
+
+def get_news_feed(url, limit=5):
+    try:
+        feed = feedparser.parse(url)
+        return feed.entries[:limit]
+    except:
+        return []
 
 def get_sector_leaderboard():
     sectors = {
@@ -189,36 +197,20 @@ with col_left:
         st.write("**GDP Growth:** 1.4% (Q4 Advance Estimate)")
         st.warning("Analysis: Watch for 'Stagflation' signals as growth cools while core inflation remains at 3%.")
 
-    # UPDATED CRYPTO INTELLIGENCE AGENT
     with st.expander("₿ Crypto Intelligence Agent", expanded=True):
-        cryptos = {
-            "Bitcoin (BTC)": "BTC-USD",
-            "Ethereum (ETH)": "ETH-USD",
-            "Solana (SOL)": "SOL-USD"
-        }
-        
+        cryptos = {"Bitcoin (BTC)": "BTC-USD", "Ethereum (ETH)": "ETH-USD", "Solana (SOL)": "SOL-USD"}
         c_cols = st.columns(3)
-        
         for i, (name, ticker) in enumerate(cryptos.items()):
             price = get_safe_data(ticker)
             d_rsi = calculate_rsi(ticker, "1d")
             w_rsi = calculate_rsi(ticker, "1wk")
-            
             with c_cols[i]:
                 st.write(f"**{name}**")
                 st.write(f"Price: ${price:,.2f}")
-                st.write(f"Daily RSI: {d_rsi:.1f}")
-                st.write(f"Weekly RSI: {w_rsi:.1f}")
-                
-                # Dynamic Status
-                if d_rsi > 70:
-                    st.caption("Status: 🔴 Overbought")
-                elif d_rsi < 30:
-                    st.caption("Status: 🔵 Oversold")
-                else:
-                    st.caption("Status: ⚪ Neutral")
-        
-        st.info("Analysis: BTC, ETH, and SOL act as primary sensors for global dollar liquidity and risk appetite.")
+                st.write(f"Daily RSI: {d_rsi:.1f} | Weekly: {w_rsi:.1f}")
+                status_color = "🔴" if d_rsi > 70 else ("🔵" if d_rsi < 30 else "⚪")
+                st.caption(f"Status: {status_color}")
+        st.info("Analysis: BTC, ETH, and SOL act as primary sensors for global dollar liquidity.")
 
 with col_right:
     with st.expander("🌊 Liquidity Watch Agent", expanded=True):
@@ -237,22 +229,29 @@ with col_right:
     with st.expander("📜 Fiscal Policy & Treasury Issuance", expanded=True):
         st.write("**Recent QRA:** Treasury offering $125B in securities (Feb 2026).")
         st.write("**Liquidity Summary:** Treasury shifting more issuance into 'Coupons.'")
-        st.info("**Analysis:** A shift from T-Bills to Coupons drains bank reserves. This usually increases equity volatility and puts upward pressure on term premiums.")
 
 st.divider()
 
-# --- GEOPOLITICAL INTELLIGENCE AGENT ---
-st.subheader("🌍 Geopolitical Intelligence Agent")
+# --- GEOPOLITICAL AGENT ---
+st.subheader("🌍 Geopolitical Intelligence Agent (Live Feed)")
 geo_left, geo_right = st.columns(2)
-with geo_left:
-    st.write("**🔴 Geopolitical Headwinds**")
-    st.write("- **Trade Friction:** Increasing tariffs and export controls on high-end semiconductors.")
-    st.write("- **Energy Stability:** Escalating tensions in key maritime corridors impacting oil delivery cost.")
-    st.write("- **Asset Impact:** 🔴 Bearish for Emerging Markets, Global Logistics, and Consumer Tech.")
-with geo_right:
-    st.write("**🟢 Geopolitical Tailwinds**")
-    st.write("- **Near-Shoring:** Accelerating industrial capital expenditure in the Western Hemisphere pivot.")
-    st.write("- **Defense Modernization:** Multi-year budget expansion for re-armament and cybersecurity.")
-    st.write("- **Asset Impact:** 🟢 Bullish for Defense Stocks, Cybersecurity, Gold, and Domestic Industrials.")
 
-st.caption(f"Last Agent Update: {datetime.now().strftime('%Y-%m-%d %H:%M')} | Data Source: [Yahoo Finance](https://finance.yahoo.com)")
+with geo_left:
+    st.write("**🌍 Global Headlines (Reuters)**")
+    reuters_news = get_news_feed("https://www.reutersagency.com/feed/?best-topics=world-news&post_type=best")
+    if reuters_news:
+        for entry in reuters_news:
+            st.markdown(f"- [{entry.title}]({entry.link})")
+    else:
+        st.write("Fetching latest world headlines...")
+
+with geo_right:
+    st.write("**💰 Market & Finance Headlines (CNBC)**")
+    cnbc_news = get_news_feed("https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114")
+    if cnbc_news:
+        for entry in cnbc_news:
+            st.markdown(f"- [{entry.title}]({entry.link})")
+    else:
+        st.write("Fetching latest financial headlines...")
+
+st.caption(f"Last Agent Update: {datetime.now().strftime('%Y-%m-%d %H:%M')} | Data Sources: Yahoo Finance, Reuters, CNBC")

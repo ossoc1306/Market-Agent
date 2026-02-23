@@ -5,10 +5,10 @@ import feedparser
 from datetime import datetime
 
 # PAGE CONFIG
-st.set_page_config(page_title="Global Asset Intelligence", layout="wide")
+st.set_page_config(page_title="Multi-Asset Terminal", layout="wide")
 
-st.title("🛡️ Global Asset Intel")
-st.subheader("G.A.I. Multi-Asset Terminal")
+st.title("🛡️ Multi-Asset Terminal")
+st.subheader("Global Asset Intel | G.A.I. Multi-Asset Overlay")
 
 # --- OPTIMIZED DATA MINING FUNCTIONS ---
 @st.cache_data(ttl=600) # Makes subsequent loads instant

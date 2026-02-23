@@ -189,11 +189,36 @@ with col_left:
         st.write("**GDP Growth:** 1.4% (Q4 Advance Estimate)")
         st.warning("Analysis: Watch for 'Stagflation' signals as growth cools while core inflation remains at 3%.")
 
+    # UPDATED CRYPTO INTELLIGENCE AGENT
     with st.expander("₿ Crypto Intelligence Agent", expanded=True):
-        st.write(f"**Bitcoin Price:** ${btc_now:,.2f}")
-        btc_trend = "🟢 Bullish" if btc_now > btc_200ma else "🔴 Bearish"
-        st.write(f"**BTC Trend:** {btc_trend}")
-        st.info("Analysis: BTC acts as a sensor for global dollar liquidity.")
+        cryptos = {
+            "Bitcoin (BTC)": "BTC-USD",
+            "Ethereum (ETH)": "ETH-USD",
+            "Solana (SOL)": "SOL-USD"
+        }
+        
+        c_cols = st.columns(3)
+        
+        for i, (name, ticker) in enumerate(cryptos.items()):
+            price = get_safe_data(ticker)
+            d_rsi = calculate_rsi(ticker, "1d")
+            w_rsi = calculate_rsi(ticker, "1wk")
+            
+            with c_cols[i]:
+                st.write(f"**{name}**")
+                st.write(f"Price: ${price:,.2f}")
+                st.write(f"Daily RSI: {d_rsi:.1f}")
+                st.write(f"Weekly RSI: {w_rsi:.1f}")
+                
+                # Dynamic Status
+                if d_rsi > 70:
+                    st.caption("Status: 🔴 Overbought")
+                elif d_rsi < 30:
+                    st.caption("Status: 🔵 Oversold")
+                else:
+                    st.caption("Status: ⚪ Neutral")
+        
+        st.info("Analysis: BTC, ETH, and SOL act as primary sensors for global dollar liquidity and risk appetite.")
 
 with col_right:
     with st.expander("🌊 Liquidity Watch Agent", expanded=True):

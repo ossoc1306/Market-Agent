@@ -7,8 +7,8 @@ from datetime import datetime
 # PAGE CONFIG
 st.set_page_config(page_title="Global Asset Intelligence", layout="wide")
 
-st.title("🛡️ Global Asset Intelligence")
-st.subheader("Multi-Asset Overlay")
+st.title("🛡️ Global Asset Intel")
+st.subheader("G.A.I. Multi-Asset Terminal")
 
 # --- OPTIMIZED DATA MINING FUNCTIONS ---
 @st.cache_data(ttl=600) # Makes subsequent loads instant

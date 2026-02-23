@@ -10,7 +10,8 @@ st.set_page_config(page_title="Global Asset Intelligence", layout="wide")
 st.title("🛡️ Global Asset Intelligence")
 st.subheader("Multi-Asset Overlay")
 
-# --- ROBUST DATA MINING FUNCTIONS ---
+# --- OPTIMIZED DATA MINING FUNCTIONS ---
+@st.cache_data(ttl=600) # Makes subsequent loads instant
 def get_safe_data(ticker):
     try:
         d = yf.download(ticker, period="5d", progress=False)
@@ -20,6 +21,7 @@ def get_safe_data(ticker):
     except:
         return 0.0
 
+@st.cache_data(ttl=600)
 def calculate_rsi(ticker, period="1d", window=14):
     try:
         hp = "60d" if period == "1d" else "2y"
@@ -34,6 +36,7 @@ def calculate_rsi(ticker, period="1d", window=14):
     except:
         return 50.0
 
+@st.cache_data(ttl=600)
 def get_sma(ticker, window):
     try:
         d = yf.download(ticker, period="2y", progress=False)
@@ -41,13 +44,15 @@ def get_sma(ticker, window):
     except:
         return 0.0
 
+@st.cache_data(ttl=300) # Refresh news every 5 mins
 def get_news_feed(url, limit=5):
     try:
         feed = feedparser.parse(url)
-        return feed.entries[:limit]
+        return [{"title": e.title, "link": e.link} for e in feed.entries[:limit]]
     except:
         return []
 
+@st.cache_data(ttl=600)
 def get_sector_leaderboard():
     sectors = {
         "XLC": "Comm Services", "XLY": "Consumer Disc", "XLP": "Consumer Staples",
@@ -74,11 +79,7 @@ def get_sector_leaderboard():
             b_list = [f"{sectors[t]}: {v:+.1f}% (RSI: {sector_rsis[t]:.1f})" for t, v in bot5.items()]
             return t_list, b_list
 
-        d_t, d_b = get_ranks(daily)
-        w_t, w_b = get_ranks(weekly)
-        m_t, m_b = get_ranks(monthly)
-        y_t, y_b = get_ranks(ytd)
-        return (d_t, d_b), (w_t, w_b), (m_t, m_b), (y_t, y_b), sector_rsis, sectors
+        return get_ranks(daily), get_ranks(weekly), get_ranks(monthly), get_ranks(ytd), sector_rsis, sectors
     except:
         err = ["Data Pending"]*5
         return (err, err), (err, err), (err, err), (err, err), {}, {}
@@ -202,13 +203,13 @@ with col_left:
         c_cols = st.columns(3)
         for i, (name, ticker) in enumerate(cryptos.items()):
             price = get_safe_data(ticker)
-            d_rsi = calculate_rsi(ticker, "1d")
-            w_rsi = calculate_rsi(ticker, "1wk")
+            dr = calculate_rsi(ticker, "1d")
+            wr = calculate_rsi(ticker, "1wk")
             with c_cols[i]:
                 st.write(f"**{name}**")
                 st.write(f"Price: ${price:,.2f}")
-                st.write(f"Daily RSI: {d_rsi:.1f} | Weekly: {w_rsi:.1f}")
-                status_color = "🔴" if d_rsi > 70 else ("🔵" if d_rsi < 30 else "⚪")
+                st.write(f"Daily RSI: {dr:.1f} | Weekly: {wr:.1f}")
+                status_color = "🔴" if dr > 70 else ("🔵" if dr < 30 else "⚪")
                 st.caption(f"Status: {status_color}")
         st.info("Analysis: BTC, ETH, and SOL act as primary sensors for global dollar liquidity.")
 
@@ -237,21 +238,22 @@ st.subheader("🌍 Geopolitical Intelligence Agent (Live Feed)")
 geo_left, geo_right = st.columns(2)
 
 with geo_left:
-    st.write("**🌍 Global Headlines (Reuters)**")
-    reuters_news = get_news_feed("https://www.reutersagency.com/feed/?best-topics=world-news&post_type=best")
-    if reuters_news:
-        for entry in reuters_news:
-            st.markdown(f"- [{entry.title}]({entry.link})")
+    st.write("**🌍 Global Headlines (BBC World News)**")
+    # Switched to BBC for maximum reliability/speed
+    world_news = get_news_feed("https://feeds.bbci.co.uk/news/world/rss.xml")
+    if world_news:
+        for entry in world_news:
+            st.markdown(f"- [{entry['title']}]({entry['link']})")
     else:
-        st.write("Fetching latest world headlines...")
+        st.write("Headlines currently unavailable. Try refreshing.")
 
 with geo_right:
     st.write("**💰 Market & Finance Headlines (CNBC)**")
     cnbc_news = get_news_feed("https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114")
     if cnbc_news:
         for entry in cnbc_news:
-            st.markdown(f"- [{entry.title}]({entry.link})")
+            st.markdown(f"- [{entry['title']}]({entry['link']})")
     else:
-        st.write("Fetching latest financial headlines...")
+        st.write("Finance news currently loading...")
 
-st.caption(f"Last Agent Update: {datetime.now().strftime('%Y-%m-%d %H:%M')} | Data Sources: Yahoo Finance, Reuters, CNBC")
+st.caption(f"Last Agent Update: {datetime.now().strftime('%Y-%m-%d %H:%M')} | Data Source: Yahoo Finance, BBC, CNBC")

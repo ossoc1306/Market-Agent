@@ -318,17 +318,17 @@ with tab_alpha:
     st.subheader("🚨 Significant Macro Exit Alerts")
     st.warning("**Agent Update:** Monitoring for $1M+ liquidations to identify institutional distribution.")
 
-# --- 3. COMPACT YTD PORTFOLIO LAB TAB ---
+# --- 3. COMPACT YTD PORTFOLIO LAB (WITH TICKERS) ---
 with tab_lab:
     # --- COMPACT CSS UI INJECTION ---
     st.markdown("""
         <style>
             [data-testid="stTable"] td, [data-testid="stTable"] th {
-                font-size: 13px !important;
-                padding: 4px 8px !important;
+                font-size: 12px !important;
+                padding: 4px 6px !important;
             }
             [data-testid="stMetricValue"] {
-                font-size: 1.8rem !important;
+                font-size: 1.6rem !important;
             }
             .stDataFrame {
                 height: 400px;
@@ -366,6 +366,9 @@ with tab_lab:
         for name, weights in PORTFOLIOS.items():
             ytd_perf = 0
             count = 0
+            # Create a string of tickers for this portfolio
+            ticker_str = ", ".join(weights.keys())
+            
             for ticker, weight in weights.items():
                 if ticker in p_prices:
                     change = (p_prices[ticker]["current"] / p_prices[ticker]["ytd_start"]) - 1
@@ -375,6 +378,7 @@ with tab_lab:
             if count > 0:
                 perf_list.append({
                     "Portfolio Design": name,
+                    "Tickers": ticker_str,
                     "YTD %": round(ytd_perf * 100, 2)
                 })
 
@@ -399,14 +403,14 @@ with tab_lab:
     st.divider()
     with st.expander("ℹ️ Portfolio Design Methodologies (All 10 Models)", expanded=False):
         st.markdown("""
-        1. **All-Weather (Ray Dalio):** Designed to survive any economic season (inflation, deflation, growth, or recession) by balancing risk across stocks, long/intermediate bonds, gold, and commodities.
-        2. **60/40 Portfolio:** The classic 'balanced' benchmark. 60% equities for growth and 40% bonds for income and stability.
-        3. **Fugger Portfolio:** A 500-year-old preservation strategy based on the wealth of Jakob Fugger. Equal 25% splits into Stocks, Real Estate, Bonds, and Gold.
-        4. **Permanent Portfolio (Harry Browne):** Built for extreme safety. 25% each in Stocks, Long-Term Bonds, Cash (Short-Term Bonds), and Gold to hedge against all macro outcomes.
-        5. **Golden Butterfly:** A variant of the Permanent Portfolio that adds a 'tilt' toward Small-Cap Value stocks to increase long-term growth potential while maintaining the bond and gold hedges.
-        6. **Three-Fund Portfolio (Bogleheads):** The ultimate passive strategy. Uses only three broad market indexes: US Total Stock Market, International Stock Market, and Total Bond Market.
-        7. **Coffeehouse Portfolio:** A diversifed model that splits equities into multiple 'styles' (Large Cap, Small Cap, Value, REITs) while keeping a steady 40% in fixed income.
-        8. **Ivy League (Swensen/Yale Model):** Mimics the Yale Endowment strategy by David Swensen. Focuses heavily on alternative asset classes like Real Estate (REITs) and Emerging Markets alongside traditional stocks and bonds.
-        9. **Warren Buffett Portfolio:** Buffett’s recommended simple legacy strategy: 90% in a low-cost S&P 500 index fund and 10% in short-term government bonds (cash).
-        10. **Global Asset Allocation (Meb Faber):** A highly diversified 'Buy the World' strategy that includes global stocks, corporate bonds, treasuries, gold, and commodities.
+        1. **All-Weather (Ray Dalio):** Designed to survive any economic season by balancing risk across VTI, TLT, IEF, GLD, and DBC.
+        2. **60/40 Portfolio:** The classic 'balanced' benchmark using VTI (60%) and BND (40%).
+        3. **Fugger Portfolio:** Wealth preservation via VTI, VNQ, BND, and GLD.
+        4. **Permanent Portfolio (Harry Browne):** Safety-first split between VTI, TLT, BIL, and GLD.
+        5. **Golden Butterfly:** Variant of Permanent Portfolio using VTI, IJS, TLT, SHV, and GLD.
+        6. **Three-Fund Portfolio (Bogleheads):** Simple broad index strategy using VTI, VXUS, and BND.
+        7. **Coffeehouse Portfolio:** Diversified equity styles (VOO, IJS, IJV, VEA, VNQ, VIG) with AGG for income.
+        8. **Ivy League (Swensen/Yale Model):** Mimics endowment strategy using VTI, VEA, VWO, VNQ, IEF, and TIP.
+        9. **Warren Buffett Portfolio:** 90% in VOO (S&P 500) and 10% in BIL (Cash/Bonds).
+        10. **Global Asset Allocation (Meb Faber):** Highly diversified world strategy across VTI, VEA, VWO, LQD, TLT, GLD, DBC, and VNQ.
         """)

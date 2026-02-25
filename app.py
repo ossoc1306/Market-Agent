@@ -318,50 +318,52 @@ with tab_alpha:
     st.subheader("🚨 Significant Macro Exit Alerts")
     st.warning("**Agent Update:** Monitoring for $1M+ liquidations to identify institutional distribution.")
 
-# --- 3. HARDENED PORTFOLIO LAB TAB ---
+# --- 3. HARDENED PORTFOLIO LAB TAB (YTD FOCUS) ---
 with tab_lab:
     st.header("📈 Lazy Portfolio Performance Lab")
-    st.write("Real-time tracking of the world's most popular institutional and retail portfolio designs.")
+    st.write("Real-time tracking of Year-to-Date (YTD) performance for popular investment designs.")
 
     all_p_tickers = list(set([t for p in PORTFOLIOS.values() for t in p.keys()]))
     
-    @st.cache_data(ttl=600)
-    def get_hardened_portfolio_data(tickers):
+    @st.cache_data(ttl=3600)
+    def get_ytd_portfolio_data(tickers):
         prices = {}
+        current_year = datetime.now().year
+        ytd_start_date = f"{current_year}-01-01"
         for ticker in tickers:
             try:
-                # Use 5d to ensure we always have at least two valid market days
-                df = yf.download(ticker, period="5d", progress=False)
-                if not df.empty and len(df) >= 2:
+                # Fetch data from start of year to now
+                df = yf.download(ticker, start=ytd_start_date, progress=False)
+                if not df.empty and len(df) >= 1:
                     prices[ticker] = {
                         "current": df['Close'].iloc[-1].item(),
-                        "prev": df['Close'].iloc[-2].item()
+                        "ytd_start": df['Close'].iloc[0].item()
                     }
             except:
                 continue
         return prices
 
-    p_prices = get_hardened_portfolio_data(all_p_tickers)
+    p_prices = get_ytd_portfolio_data(all_p_tickers)
 
     perf_list = []
     if p_prices:
         for name, weights in PORTFOLIOS.items():
-            daily_perf = 0
+            ytd_perf = 0
             count = 0
             for ticker, weight in weights.items():
                 if ticker in p_prices:
-                    change = (p_prices[ticker]["current"] / p_prices[ticker]["prev"]) - 1
-                    daily_perf += (change * weight)
+                    change = (p_prices[ticker]["current"] / p_prices[ticker]["ytd_start"]) - 1
+                    ytd_perf += (change * weight)
                     count += 1
             
             if count > 0:
                 perf_list.append({
                     "Portfolio Design": name,
-                    "Daily Change %": round(daily_perf * 100, 2)
+                    "YTD Performance %": round(ytd_perf * 100, 2)
                 })
 
     if perf_list:
-        df_p_perf = pd.DataFrame(perf_list).sort_values(by="Daily Change %", ascending=False)
+        df_p_perf = pd.DataFrame(perf_list).sort_values(by="YTD Performance %", ascending=False)
         st.dataframe(df_p_perf, use_container_width=True, hide_index=True)
         
         m1, m2, m3 = st.columns(3)
@@ -369,19 +371,25 @@ with tab_lab:
         bot_p = df_p_perf.iloc[-1]
         
         bench_df = df_p_perf[df_p_perf["Portfolio Design"] == "60/40 Portfolio"]
-        bench_val = f"{bench_df.iloc[0]['Daily Change %']}%" if not bench_df.empty else "N/A"
+        bench_val = f"{bench_df.iloc[0]['YTD Performance %']}%" if not bench_df.empty else "N/A"
         
-        m1.metric("Top Performer", top_p["Portfolio Design"], f"{top_p['Daily Change %']}%")
-        m2.metric("Benchmark (60/40)", "Traditional Balanced", bench_val)
-        m3.metric("Laggard", bot_p["Portfolio Design"], f"{bot_p['Daily Change %']}%")
+        m1.metric("YTD Top Performer", top_p["Portfolio Design"], f"{top_p['YTD Performance %']}%")
+        m2.metric("Benchmark (60/40)", "YTD Balanced", bench_val)
+        m3.metric("YTD Laggard", bot_p["Portfolio Design"], f"{bot_p['YTD Performance %']}%")
     else:
-        st.warning("⚠️ Market data unavailable. Please refresh or wait for the next update window.")
+        st.warning("⚠️ Market data unavailable for YTD calculation. Please try again during market hours.")
 
     st.divider()
-    with st.expander("ℹ️ Portfolio Design Methodology"):
-        st.write("""
-        - **All-Weather:** Dalio's risk-parity model balancing Stocks, Bonds, and Commodities.
-        - **60/40:** The standard benchmark for a diversified retirement portfolio.
-        - **Fugger:** 500-year-old preservation model splitting Stocks, Real Estate, Bonds, and Gold.
-        - **Warren Buffett:** A simple 90% S&P 500 and 10% Cash (Short-term Treasury) split.
+    with st.expander("ℹ️ Portfolio Design Methodologies (All 10 Models)", expanded=True):
+        st.markdown("""
+        1. **All-Weather (Ray Dalio):** Designed to survive any economic season (inflation, deflation, growth, or recession) by balancing risk across stocks, long/intermediate bonds, gold, and commodities.
+        2. **60/40 Portfolio:** The classic 'balanced' benchmark. 60% equities for growth and 40% bonds for income and stability.
+        3. **Fugger Portfolio:** A 500-year-old preservation strategy based on the wealth of Jakob Fugger. Equal 25% splits into Stocks, Real Estate, Bonds, and Gold.
+        4. **Permanent Portfolio (Harry Browne):** Built for extreme safety. 25% each in Stocks, Long-Term Bonds, Cash (Short-Term Bonds), and Gold to hedge against all macro outcomes.
+        5. **Golden Butterfly:** A variant of the Permanent Portfolio that adds a 'tilt' toward Small-Cap Value stocks to increase long-term growth potential while maintaining the bond and gold hedges.
+        6. **Three-Fund Portfolio (Bogleheads):** The ultimate passive strategy. Uses only three broad market indexes: US Total Stock Market, International Stock Market, and Total Bond Market.
+        7. **Coffeehouse Portfolio:** A diversifed model that splits equities into multiple 'styles' (Large Cap, Small Cap, Value, REITs) while keeping a steady 40% in fixed income.
+        8. **Ivy League (Swensen/Yale Model):** Mimics the Yale Endowment strategy by David Swensen. Focuses heavily on alternative asset classes like Real Estate (REITs) and Emerging Markets alongside traditional stocks and bonds.
+        9. **Warren Buffett Portfolio:** Buffett’s recommended simple legacy strategy: 90% in a low-cost S&P 500 index fund and 10% in short-term government bonds (cash).
+        10. **Global Asset Allocation (Meb Faber):** A highly diversified 'Buy the World' strategy that includes global stocks, corporate bonds, treasuries, gold, and commodities.
         """)

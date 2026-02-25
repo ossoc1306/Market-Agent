@@ -8,15 +8,15 @@ from datetime import datetime
 # PAGE CONFIG
 st.set_page_config(page_title="Multi-Asset Terminal", layout="wide")
 
-# --- PORTFOLIO DEFINITIONS ---
+# --- PORTFOLIO DEFINITIONS (Using highly liquid ETFs) ---
 PORTFOLIOS = {
     "All-Weather (Dalio)": {"VTI": 0.30, "TLT": 0.40, "IEF": 0.15, "GLD": 0.075, "DBC": 0.075},
-    "60/40 Portfolio": {"VTI": 0.60, "AGG": 0.40},
+    "60/40 Portfolio": {"VTI": 0.60, "BND": 0.40},
     "Fugger Portfolio": {"VTI": 0.25, "VNQ": 0.25, "BND": 0.25, "GLD": 0.25},
     "Permanent Portfolio": {"VTI": 0.25, "TLT": 0.25, "BIL": 0.25, "GLD": 0.25},
     "Golden Butterfly": {"VTI": 0.20, "IJS": 0.20, "TLT": 0.20, "SHV": 0.20, "GLD": 0.20},
     "Three-Fund": {"VTI": 0.34, "VXUS": 0.33, "BND": 0.33},
-    "Coffeehouse": {"VOO": 0.10, "IJS": 0.10, "VEA": 0.10, "VNQ": 0.10, "AGG": 0.40},
+    "Coffeehouse": {"VOO": 0.10, "IJS": 0.10, "IJV": 0.10, "VEA": 0.10, "VNQ": 0.10, "VIG": 0.10, "AGG": 0.40},
     "Ivy League (Swensen)": {"VTI": 0.30, "VEA": 0.15, "VWO": 0.05, "VNQ": 0.20, "IEF": 0.15, "TIP": 0.15},
     "Warren Buffett": {"VOO": 0.90, "BIL": 0.10},
     "Global Asset Allocation": {"VTI": 0.18, "VEA": 0.135, "VWO": 0.045, "LQD": 0.18, "TLT": 0.18, "GLD": 0.10, "DBC": 0.10, "VNQ": 0.08}
@@ -318,7 +318,7 @@ with tab_alpha:
     st.subheader("🚨 Significant Macro Exit Alerts")
     st.warning("**Agent Update:** Monitoring for $1M+ liquidations to identify institutional distribution.")
 
-# --- 3. REVISED PORTFOLIO LAB TAB (FIXES KEYERROR) ---
+# --- 3. HARDENED PORTFOLIO LAB TAB ---
 with tab_lab:
     st.header("📈 Lazy Portfolio Performance Lab")
     st.write("Real-time tracking of the world's most popular institutional and retail portfolio designs.")
@@ -326,39 +326,40 @@ with tab_lab:
     all_p_tickers = list(set([t for p in PORTFOLIOS.values() for t in p.keys()]))
     
     @st.cache_data(ttl=600)
-    def get_portfolio_data(tickers):
-        try:
-            df = yf.download(tickers, period="2d", progress=False)['Adj Close']
-            if df.empty or len(df) < 2:
-                return pd.Series(), pd.Series()
-            return df.iloc[-1], df.iloc[-2]
-        except:
-            return pd.Series(), pd.Series()
-
-    curr_p_prices, prev_p_prices = get_portfolio_data(all_p_tickers)
-
-    perf_list = []
-    if not curr_p_prices.empty:
-        for name, weights in PORTFOLIOS.items():
+    def get_hardened_portfolio_data(tickers):
+        prices = {}
+        for ticker in tickers:
             try:
-                daily_perf = 0
-                valid_weights = 0
-                for ticker, weight in weights.items():
-                    # Validate ticker exists in prices to prevent KeyErrors
-                    if ticker in curr_p_prices and pd.notnull(curr_p_prices[ticker]):
-                        change = (curr_p_prices[ticker] / prev_p_prices[ticker]) - 1
-                        daily_perf += (change * weight)
-                        valid_weights += weight
-                
-                if valid_weights > 0:
-                    perf_list.append({
-                        "Portfolio Design": name,
-                        "Daily Change %": round(daily_perf * 100, 2)
-                    })
+                # Use 5d to ensure we always have at least two valid market days
+                df = yf.download(ticker, period="5d", progress=False)
+                if not df.empty and len(df) >= 2:
+                    prices[ticker] = {
+                        "current": df['Close'].iloc[-1].item(),
+                        "prev": df['Close'].iloc[-2].item()
+                    }
             except:
                 continue
+        return prices
 
-    # Only attempt sorting and display if the list isn't empty
+    p_prices = get_hardened_portfolio_data(all_p_tickers)
+
+    perf_list = []
+    if p_prices:
+        for name, weights in PORTFOLIOS.items():
+            daily_perf = 0
+            count = 0
+            for ticker, weight in weights.items():
+                if ticker in p_prices:
+                    change = (p_prices[ticker]["current"] / p_prices[ticker]["prev"]) - 1
+                    daily_perf += (change * weight)
+                    count += 1
+            
+            if count > 0:
+                perf_list.append({
+                    "Portfolio Design": name,
+                    "Daily Change %": round(daily_perf * 100, 2)
+                })
+
     if perf_list:
         df_p_perf = pd.DataFrame(perf_list).sort_values(by="Daily Change %", ascending=False)
         st.dataframe(df_p_perf, use_container_width=True, hide_index=True)
@@ -374,13 +375,13 @@ with tab_lab:
         m2.metric("Benchmark (60/40)", "Traditional Balanced", bench_val)
         m3.metric("Laggard", bot_p["Portfolio Design"], f"{bot_p['Daily Change %']}%")
     else:
-        st.warning("⚠️ Market data unavailable. This is usually due to API limits or markets being closed.")
+        st.warning("⚠️ Market data unavailable. Please refresh or wait for the next update window.")
 
     st.divider()
     with st.expander("ℹ️ Portfolio Design Methodology"):
         st.write("""
-        - **All-Weather:** Dalio's risk-parity model (Stocks, Long Bonds, Med Bonds, Gold, Commodities).
-        - **60/40:** Standard institutional benchmark.
-        - **Fugger:** Wealth preservation via Real Estate, Gold, and traditional assets.
-        - **Warren Buffett:** Simple 90/10 S&P 500 and Cash split.
+        - **All-Weather:** Dalio's risk-parity model balancing Stocks, Bonds, and Commodities.
+        - **60/40:** The standard benchmark for a diversified retirement portfolio.
+        - **Fugger:** 500-year-old preservation model splitting Stocks, Real Estate, Bonds, and Gold.
+        - **Warren Buffett:** A simple 90% S&P 500 and 10% Cash (Short-term Treasury) split.
         """)

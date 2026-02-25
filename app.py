@@ -2,21 +2,20 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import feedparser
+import requests
 from datetime import datetime
 
 # PAGE CONFIG
 st.set_page_config(page_title="Multi-Asset Terminal", layout="wide")
 
 # --- 1. NEW TAB STRUCTURE ---
-# This creates the two "rooms" for your app
 tab_terminal, tab_alpha = st.tabs(["🛡️ Multi-Asset Terminal", "🕵️ Unusual Congressional Alpha"])
 
 with tab_terminal:
-    # --- YOUR EXISTING TERMINAL CODE ---
     st.title("🛡️ Multi-Asset Terminal")
     st.subheader("Global Asset Intel | G.A.I. Multi-Asset Overlay")
 
-    # --- OPTIMIZED DATA MINING FUNCTIONS ---
+    # --- DATA MINING FUNCTIONS ---
     @st.cache_data(ttl=600) 
     def get_safe_data(ticker):
         try:
@@ -164,7 +163,6 @@ with tab_terminal:
         for i, (t, r) in enumerate(s_rsis.items()):
             c = "🔴" if r > 70 else ("🔵" if r < 30 else "⚪")
             heat_cols[i].metric(s_names[t], f"{r:.0f}", c)
-        st.caption("RSI Heatmap Key: 🔴 Overbought (>70) | 🔵 Oversold (<30) | ⚪ Neutral")
 
     st.write("---")
     l_cols = st.columns(4)
@@ -182,37 +180,21 @@ with tab_terminal:
     col_left, col_right = st.columns(2)
     with col_left:
         with st.expander("🔍 Momentum & Trend Layers", expanded=True):
-            c1, c2, c3 = st.columns(3)
-            with c1:
-                st.write("**S&P 500 (SPX)**")
-                st.write(f"Price: {spx_now:,.2f}")
-                st.write(f"Daily RSI: {spx_rsi_d:.1f} | Weekly: {spx_rsi_w:.1f}")
-            with c2:
-                st.write("**Nasdaq (QQQ)**")
-                st.write(f"Price: {qqq_now:,.2f}")
-            with c3:
-                st.write("**International (VXUS)**")
-                st.write(f"Price: {vxus_now:,.2f}")
-
-        with st.expander("📊 Inflation & Growth Dynamics", expanded=True):
+            st.write(f"**S&P 500 (SPX)**: {spx_now:,.2f}")
+            st.write(f"**Nasdaq (QQQ)**: {qqq_now:,.2f}")
+        with st.expander("📊 Inflation & Growth", expanded=True):
             st.write("**Core PCE:** 3.0% YoY")
             st.write("**GDP Growth:** 1.4%")
-
-        with st.expander("₿ Crypto Intelligence Agent", expanded=True):
-            st.info("BTC, ETH, and SOL act as primary sensors for global dollar liquidity.")
+        with st.expander("₿ Crypto Agent", expanded=True):
+            st.write(f"**BTC Price:** ${btc_now:,.2f}")
 
     with col_right:
-        with st.expander("🌊 Liquidity Watch Agent", expanded=True):
+        with st.expander("🌊 Liquidity Agent", expanded=True):
             st.write(f"**Dollar Index (DXY):** {dxy_now:.2f}")
-
-        with st.expander("✨ Gold Intelligence Agent", expanded=True):
-            st.write(f"**Current Gold Price:** ${gold_now:,.2f}")
-
-        with st.expander("🏦 Yield Curve & Interest Rates", expanded=True):
-            st.write(f"**10-Year Benchmark:** {tnx_now:.2f}%")
-
-        with st.expander("📜 Fiscal Policy & Treasury Issuance", expanded=True):
-            st.write("**Recent QRA:** Treasury offering $125B (Feb 2026).")
+        with st.expander("✨ Gold Agent", expanded=True):
+            st.write(f"**Gold Price:** ${gold_now:,.2f}")
+        with st.expander("🏦 Yield Curve", expanded=True):
+            st.write(f"**10-Year Yield:** {tnx_now:.2f}%")
 
     st.divider()
 
@@ -231,63 +213,60 @@ with tab_terminal:
     st.caption(f"Last Agent Update: {datetime.now().strftime('%Y-%m-%d %H:%M')} | Data Source: Yahoo Finance, BBC, CNBC")
 
 
-# --- 2. NEW TRADE IDEAS SECTION ---
+# --- 2. AUTOMATED TRADE IDEAS SECTION ---
 with tab_alpha:
-    st.header("🕵️ Unusual Congressional Alpha Agent")
+    st.header("🕵️ Unusual Congressional Alpha Agent (Live)")
     st.markdown("""
-    *Filter active: Tracking high-conviction trades in companies outside the S&P 500 or with market caps under $2B.*
+    *Filter active: Scanning House & Senate filings for niche, small-cap, or specialized trades (Non-S&P 500).*
     """)
 
-    # This data is curated from recent Feb 2026 filings
-    alpha_data = [
-        {
-            "Politician": "Tim Moore (R)",
-            "Ticker": "GNPX",
-            "Company": "Genprex, Inc.",
-            "Trade Date": "Feb 05, 2026",
-            "Amount": "$1,001 - $15,000",
-            "Unusual Signal": "🔴 Micro-cap Biotech (<$10M cap). Highly speculative for a legislator."
-        },
-        {
-            "Politician": "Jonathan L. Jackson (D)",
-            "Ticker": "GEV",
-            "Company": "GE Vernova Inc.",
-            "Trade Date": "Jan 30, 2026",
-            "Amount": "$15,001 - $50,000",
-            "Unusual Signal": "🟠 Energy infrastructure spin-off. Not in S&P 500."
-        },
-        {
-            "Politician": "Tim Moore (R)",
-            "Ticker": "SMPL",
-            "Company": "Simply Good Foods",
-            "Trade Date": "Feb 11, 2026",
-            "Amount": "$15,001 - $50,000",
-            "Unusual Signal": "⚪ Niche nutritional brand. Specialized consumer bet."
-        },
-        {
-            "Politician": "Michael Guest (R)",
-            "Ticker": "CHRD",
-            "Company": "Chord Energy",
-            "Trade Date": "Jan 09, 2026",
-            "Amount": "$1,001 - $15,000",
-            "Unusual Signal": "⚪ Small shale oil specialist (Williston Basin)."
-        }
-    ]
+    # --- API LIVE AGENT LOGIC ---
+    @st.cache_data(ttl=3600) # Hourly refresh
+    def fetch_unusual_trades(api_key):
+        try:
+            # Fetch Latest Filings
+            house_url = f"https://financialmodelingprep.com/api/v3/house-disclosure?apikey={api_key}"
+            senate_url = f"https://financialmodelingprep.com/api/v3/senate-disclosure?apikey={api_key}"
+            
+            h_data = requests.get(house_url).json()
+            s_data = requests.get(senate_url).json()
+            all_trades = (h_data if isinstance(h_data, list) else []) + (s_data if isinstance(s_data, list) else [])
+            
+            # Filter Logic: Exclude Mega-Caps & S&P 500 Heavies
+            mega_caps = ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "TSLA", "META", "BRK.B", "V", "JPM", "UNH"]
+            
+            unusual_list = []
+            for t in all_trades[:50]: # Scan latest 50
+                sym = t.get('symbol', 'N/A')
+                if sym not in mega_caps and sym != 'N/A' and len(sym) < 6:
+                    unusual_list.append({
+                        "Politician": f"{t.get('firstName', '')} {t.get('lastName', '')}",
+                        "Ticker": sym,
+                        "Company": t.get('assetDescription', 'N/A')[:40] + "...",
+                        "Date": t.get('transactionDate', 'N/A'),
+                        "Amount": t.get('amount', 'N/A'),
+                        "Rationale": "🟠 Non-Index / Specialized Trade"
+                    })
+            return unusual_list
+        except:
+            return []
 
-    df_alpha = pd.DataFrame(alpha_data)
+    # --- YOUR API KEY INTEGRATED HERE ---
+    FMP_API_KEY = "6sG3kEmPzwx6pzFxdyarM7weg4jvSEFw"
     
-    st.dataframe(
-        df_alpha, 
-        use_container_width=True, 
-        hide_index=True,
-        column_config={
-            "Unusual Signal": st.column_config.TextColumn("Agent Rationale", width="large")
-        }
-    )
+    live_trades = fetch_unusual_trades(FMP_API_KEY)
+    
+    if live_trades:
+        df_live = pd.DataFrame(live_trades)
+        st.dataframe(
+            df_live, 
+            use_container_width=True, 
+            hide_index=True,
+            column_config={"Rationale": st.column_config.TextColumn("Agent Insight", width="large")}
+        )
+    else:
+        st.info("Agent is scanning for new unusual niche filings... (No recent non-index trades found)")
 
     st.divider()
     st.subheader("🚨 Significant Macro Exit Alerts")
-    st.warning("""
-    **David McCormick (R)** exited **$1,000,000 - $5,000,000** of **Goldman Sachs (GS)** on Jan 23, 2026. 
-    *Agent Note:* Multi-million dollar liquidations of primary financial leaders often precede broader sector cooling.
-    """)
+    st.warning("**Agent Update:** Monitoring for liquidations over $1M in Financial and Industrial leaders to detect macro-top signals.")

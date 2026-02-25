@@ -191,7 +191,7 @@ with tab_terminal:
 
     st.divider()
 
-    # --- RESTORED DEEP DIVES ---
+    # --- DEEP DIVES ---
     col_left, col_right = st.columns(2)
     with col_left:
         with st.expander("🔍 Momentum & Trend Layers (SPX, QQQ, VXUS)", expanded=True):
@@ -318,10 +318,26 @@ with tab_alpha:
     st.subheader("🚨 Significant Macro Exit Alerts")
     st.warning("**Agent Update:** Monitoring for $1M+ liquidations to identify institutional distribution.")
 
-# --- 3. HARDENED PORTFOLIO LAB TAB (YTD FOCUS) ---
+# --- 3. COMPACT YTD PORTFOLIO LAB TAB ---
 with tab_lab:
+    # --- COMPACT CSS UI INJECTION ---
+    st.markdown("""
+        <style>
+            [data-testid="stTable"] td, [data-testid="stTable"] th {
+                font-size: 13px !important;
+                padding: 4px 8px !important;
+            }
+            [data-testid="stMetricValue"] {
+                font-size: 1.8rem !important;
+            }
+            .stDataFrame {
+                height: 400px;
+            }
+        </style>
+    """, unsafe_allow_html=True)
+
     st.header("📈 Lazy Portfolio Performance Lab")
-    st.write("Real-time tracking of Year-to-Date (YTD) performance for popular investment designs.")
+    st.caption("Real-time tracking of Year-to-Date (YTD) performance for popular investment designs.")
 
     all_p_tickers = list(set([t for p in PORTFOLIOS.values() for t in p.keys()]))
     
@@ -359,28 +375,29 @@ with tab_lab:
             if count > 0:
                 perf_list.append({
                     "Portfolio Design": name,
-                    "YTD Performance %": round(ytd_perf * 100, 2)
+                    "YTD %": round(ytd_perf * 100, 2)
                 })
 
     if perf_list:
-        df_p_perf = pd.DataFrame(perf_list).sort_values(by="YTD Performance %", ascending=False)
-        st.dataframe(df_p_perf, use_container_width=True, hide_index=True)
+        df_p_perf = pd.DataFrame(perf_list).sort_values(by="YTD %", ascending=False)
+        st.dataframe(df_p_perf, use_container_width=True, hide_index=True, height=380)
         
+        st.divider()
         m1, m2, m3 = st.columns(3)
         top_p = df_p_perf.iloc[0]
         bot_p = df_p_perf.iloc[-1]
         
         bench_df = df_p_perf[df_p_perf["Portfolio Design"] == "60/40 Portfolio"]
-        bench_val = f"{bench_df.iloc[0]['YTD Performance %']}%" if not bench_df.empty else "N/A"
+        bench_val = f"{bench_df.iloc[0]['YTD %']}%" if not bench_df.empty else "N/A"
         
-        m1.metric("YTD Top Performer", top_p["Portfolio Design"], f"{top_p['YTD Performance %']}%")
-        m2.metric("Benchmark (60/40)", "YTD Balanced", bench_val)
-        m3.metric("YTD Laggard", bot_p["Portfolio Design"], f"{bot_p['YTD Performance %']}%")
+        m1.metric("YTD Leader", top_p["Portfolio Design"], f"{top_p['YTD %']}%")
+        m2.metric("60/40 Benchmark", "YTD Balanced", bench_val)
+        m3.metric("YTD Laggard", bot_p["Portfolio Design"], f"{bot_p['YTD %']}%")
     else:
-        st.warning("⚠️ Market data unavailable for YTD calculation. Please try again during market hours.")
+        st.warning("⚠️ Market data unavailable for YTD calculation.")
 
     st.divider()
-    with st.expander("ℹ️ Portfolio Design Methodologies (All 10 Models)", expanded=True):
+    with st.expander("ℹ️ Portfolio Design Methodologies (All 10 Models)", expanded=False):
         st.markdown("""
         1. **All-Weather (Ray Dalio):** Designed to survive any economic season (inflation, deflation, growth, or recession) by balancing risk across stocks, long/intermediate bonds, gold, and commodities.
         2. **60/40 Portfolio:** The classic 'balanced' benchmark. 60% equities for growth and 40% bonds for income and stability.

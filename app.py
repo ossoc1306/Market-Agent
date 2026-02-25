@@ -11,18 +11,18 @@ st.set_page_config(page_title="Multi-Asset Terminal", layout="wide")
 # --- PORTFOLIO DEFINITIONS ---
 PORTFOLIOS = {
     "All-Weather (Dalio)": {"VTI": 0.30, "TLT": 0.40, "IEF": 0.15, "GLD": 0.075, "DBC": 0.075},
-    "60/40 Portfolio": {"VTI": 0.60, "BND": 0.40},
+    "60/40 Portfolio": {"VTI": 0.60, "AGG": 0.40},
     "Fugger Portfolio": {"VTI": 0.25, "VNQ": 0.25, "BND": 0.25, "GLD": 0.25},
     "Permanent Portfolio": {"VTI": 0.25, "TLT": 0.25, "BIL": 0.25, "GLD": 0.25},
     "Golden Butterfly": {"VTI": 0.20, "IJS": 0.20, "TLT": 0.20, "SHV": 0.20, "GLD": 0.20},
     "Three-Fund": {"VTI": 0.34, "VXUS": 0.33, "BND": 0.33},
-    "Coffeehouse": {"VOO": 0.10, "IJS": 0.10, "IJV": 0.10, "VEA": 0.10, "VNQ": 0.10, "VIVIX": 0.10, "AGG": 0.40},
+    "Coffeehouse": {"VOO": 0.10, "IJS": 0.10, "VEA": 0.10, "VNQ": 0.10, "AGG": 0.40},
     "Ivy League (Swensen)": {"VTI": 0.30, "VEA": 0.15, "VWO": 0.05, "VNQ": 0.20, "IEF": 0.15, "TIP": 0.15},
     "Warren Buffett": {"VOO": 0.90, "BIL": 0.10},
     "Global Asset Allocation": {"VTI": 0.18, "VEA": 0.135, "VWO": 0.045, "LQD": 0.18, "TLT": 0.18, "GLD": 0.10, "DBC": 0.10, "VNQ": 0.08}
 }
 
-# --- 1. TABS: UPDATED TO INCLUDE PORTFOLIO LAB ---
+# --- 1. TABS NAVIGATION ---
 tab_terminal, tab_alpha, tab_lab = st.tabs(["🛡️ Multi-Asset Terminal", "🕵️ Unusual Congressional Alpha", "📈 Portfolio Lab"])
 
 with tab_terminal:
@@ -191,7 +191,7 @@ with tab_terminal:
 
     st.divider()
 
-    # --- DEEP DIVES ---
+    # --- RESTORED DEEP DIVES ---
     col_left, col_right = st.columns(2)
     with col_left:
         with st.expander("🔍 Momentum & Trend Layers (SPX, QQQ, VXUS)", expanded=True):
@@ -318,65 +318,69 @@ with tab_alpha:
     st.subheader("🚨 Significant Macro Exit Alerts")
     st.warning("**Agent Update:** Monitoring for $1M+ liquidations to identify institutional distribution.")
 
-# --- 3. NEW PORTFOLIO LAB TAB ---
+# --- 3. REVISED PORTFOLIO LAB TAB (FIXES KEYERROR) ---
 with tab_lab:
     st.header("📈 Lazy Portfolio Performance Lab")
     st.write("Real-time tracking of the world's most popular institutional and retail portfolio designs.")
 
-    # Optimized Data Fetching for Portfolios
     all_p_tickers = list(set([t for p in PORTFOLIOS.values() for t in p.keys()]))
     
     @st.cache_data(ttl=600)
     def get_portfolio_data(tickers):
         try:
-            # Get 2 days of data to calculate daily change
             df = yf.download(tickers, period="2d", progress=False)['Adj Close']
+            if df.empty or len(df) < 2:
+                return pd.Series(), pd.Series()
             return df.iloc[-1], df.iloc[-2]
         except:
             return pd.Series(), pd.Series()
 
     curr_p_prices, prev_p_prices = get_portfolio_data(all_p_tickers)
 
+    perf_list = []
     if not curr_p_prices.empty:
-        perf_list = []
         for name, weights in PORTFOLIOS.items():
             try:
-                # Calculate weighted performance
                 daily_perf = 0
+                valid_weights = 0
                 for ticker, weight in weights.items():
-                    change = (curr_p_prices[ticker] / prev_p_prices[ticker]) - 1
-                    daily_perf += (change * weight)
+                    # Validate ticker exists in prices to prevent KeyErrors
+                    if ticker in curr_p_prices and pd.notnull(curr_p_prices[ticker]):
+                        change = (curr_p_prices[ticker] / prev_p_prices[ticker]) - 1
+                        daily_perf += (change * weight)
+                        valid_weights += weight
                 
-                perf_list.append({
-                    "Portfolio Design": name,
-                    "Daily Change %": round(daily_perf * 100, 2)
-                })
+                if valid_weights > 0:
+                    perf_list.append({
+                        "Portfolio Design": name,
+                        "Daily Change %": round(daily_perf * 100, 2)
+                    })
             except:
                 continue
 
+    # Only attempt sorting and display if the list isn't empty
+    if perf_list:
         df_p_perf = pd.DataFrame(perf_list).sort_values(by="Daily Change %", ascending=False)
-        
-        # Display Leaderboard
         st.dataframe(df_p_perf, use_container_width=True, hide_index=True)
         
-        # Metric Highlights
         m1, m2, m3 = st.columns(3)
         top_p = df_p_perf.iloc[0]
         bot_p = df_p_perf.iloc[-1]
-        bench_6040 = df_p_perf[df_p_perf["Portfolio Design"] == "60/40 Portfolio"].iloc[0]
+        
+        bench_df = df_p_perf[df_p_perf["Portfolio Design"] == "60/40 Portfolio"]
+        bench_val = f"{bench_df.iloc[0]['Daily Change %']}%" if not bench_df.empty else "N/A"
         
         m1.metric("Top Performer", top_p["Portfolio Design"], f"{top_p['Daily Change %']}%")
-        m2.metric("Benchmark (60/40)", "Traditional Balanced", f"{bench_6040['Daily Change %']}%")
+        m2.metric("Benchmark (60/40)", "Traditional Balanced", bench_val)
         m3.metric("Laggard", bot_p["Portfolio Design"], f"{bot_p['Daily Change %']}%")
     else:
-        st.error("Market data temporarily unavailable. Please refresh.")
+        st.warning("⚠️ Market data unavailable. This is usually due to API limits or markets being closed.")
 
     st.divider()
     with st.expander("ℹ️ Portfolio Design Methodology"):
         st.write("""
-        - **All-Weather:** Ray Dalio's strategy to perform in all economic environments.
-        - **60/40:** The classic balanced pension fund benchmark.
-        - **Fugger:** A 500-year-old wealth preservation model (Gold, RE, Stocks, Bonds).
-        - **Golden Butterfly:** A modern take on the Permanent Portfolio with a small-cap value tilt.
-        - **Ivy League:** Modeled after David Swensen's Yale Endowment strategy.
+        - **All-Weather:** Dalio's risk-parity model (Stocks, Long Bonds, Med Bonds, Gold, Commodities).
+        - **60/40:** Standard institutional benchmark.
+        - **Fugger:** Wealth preservation via Real Estate, Gold, and traditional assets.
+        - **Warren Buffett:** Simple 90/10 S&P 500 and Cash split.
         """)

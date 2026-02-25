@@ -89,7 +89,7 @@ with tab_terminal:
             err = ["Data Pending"]*5
             return (err, err), (err, err), (err, err), (err, err), {}, {}
 
-    # Fetch Core Data
+    # --- FETCH CORE DATA ---
     spx_now = get_safe_data("^GSPC")
     qqq_now = get_safe_data("QQQ")
     vxus_now = get_safe_data("VXUS")
@@ -100,7 +100,7 @@ with tab_terminal:
     btc_now = get_safe_data("BTC-USD")
     gold_now = get_safe_data("GC=F")
 
-    # Indicators
+    # --- INDICATORS ---
     sma_200d = get_sma("^GSPC", 200)
     btc_200ma = get_sma("BTC-USD", 200)
     spx_rsi_d = calculate_rsi("^GSPC")
@@ -163,6 +163,7 @@ with tab_terminal:
         for i, (t, r) in enumerate(s_rsis.items()):
             c = "🔴" if r > 70 else ("🔵" if r < 30 else "⚪")
             heat_cols[i].metric(s_names[t], f"{r:.0f}", c)
+        st.caption("RSI Heatmap Key: 🔴 Overbought (>70) | 🔵 Oversold (<30) | ⚪ Neutral")
 
     st.write("---")
     l_cols = st.columns(4)
@@ -176,25 +177,63 @@ with tab_terminal:
 
     st.divider()
 
-    # --- DEEP DIVES ---
+    # --- RESTORED DEEP DIVES ---
     col_left, col_right = st.columns(2)
     with col_left:
-        with st.expander("🔍 Momentum & Trend Layers", expanded=True):
-            st.write(f"**S&P 500 (SPX)**: {spx_now:,.2f}")
-            st.write(f"**Nasdaq (QQQ)**: {qqq_now:,.2f}")
-        with st.expander("📊 Inflation & Growth", expanded=True):
-            st.write("**Core PCE:** 3.0% YoY")
-            st.write("**GDP Growth:** 1.4%")
-        with st.expander("₿ Crypto Agent", expanded=True):
-            st.write(f"**BTC Price:** ${btc_now:,.2f}")
+        with st.expander("🔍 Momentum & Trend Layers (SPX, QQQ, VXUS)", expanded=True):
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                st.write("**S&P 500 (SPX)**")
+                st.write(f"Price: {spx_now:,.2f}")
+                st.write(f"Daily RSI: {spx_rsi_d:.1f} | Weekly: {spx_rsi_w:.1f}")
+                st.write(f"200-MA: {sma_200d:,.2f}")
+            with c2:
+                st.write("**Nasdaq (QQQ)**")
+                st.write(f"Price: {qqq_now:,.2f}")
+                st.write(f"Daily RSI: {qqq_rsi_d:.1f} | Weekly: {calculate_rsi('QQQ', '1wk'):.1f}")
+            with c3:
+                st.write("**International (VXUS)**")
+                st.write(f"Price: {vxus_now:,.2f}")
+                st.write(f"Daily RSI: {vxus_rsi_d:.1f} | Weekly: {calculate_rsi('VXUS', '1wk'):.1f}")
+            st.info("Agent Logic: Primary trend is UP as long as we hold the 40-week line.")
+
+        with st.expander("📊 Inflation & Growth Dynamics", expanded=True):
+            st.write("**Core PCE:** 3.0% YoY (Still above Fed target)")
+            st.write("**GDP Growth:** 1.4% (Q4 Advance Estimate)")
+            st.warning("Analysis: Watch for 'Stagflation' signals as growth cools while core inflation remains at 3%.")
+
+        with st.expander("₿ Crypto Intelligence Agent (BTC, ETH, SOL)", expanded=True):
+            cryptos = {"Bitcoin (BTC)": "BTC-USD", "Ethereum (ETH)": "ETH-USD", "Solana (SOL)": "SOL-USD"}
+            c_cols = st.columns(3)
+            for i, (name, ticker) in enumerate(cryptos.items()):
+                price = get_safe_data(ticker)
+                dr = calculate_rsi(ticker, "1d")
+                wr = calculate_rsi(ticker, "1wk")
+                with c_cols[i]:
+                    st.write(f"**{name}**")
+                    st.write(f"Price: ${price:,.2f}")
+                    st.write(f"Daily RSI: {dr:.1f} | Weekly: {wr:.1f}")
+                    status_c = "🔴" if dr > 70 else ("🔵" if dr < 30 else "⚪")
+                    st.caption(f"Status: {status_c}")
+            st.info("Analysis: BTC, ETH, and SOL act as primary sensors for global dollar liquidity.")
 
     with col_right:
-        with st.expander("🌊 Liquidity Agent", expanded=True):
+        with st.expander("🌊 Liquidity Watch Agent", expanded=True):
             st.write(f"**Dollar Index (DXY):** {dxy_now:.2f}")
-        with st.expander("✨ Gold Agent", expanded=True):
-            st.write(f"**Gold Price:** ${gold_now:,.2f}")
-        with st.expander("🏦 Yield Curve", expanded=True):
-            st.write(f"**10-Year Yield:** {tnx_now:.2f}%")
+            st.info("Macro Note: Rising DXY usually acts as a 'Liquidity Vacuum' for risk assets.")
+
+        with st.expander("✨ Gold Intelligence Agent", expanded=True):
+            st.write(f"**Current Gold Price:** ${gold_now:,.2f}")
+            st.write(f"**Gold/SPX Ratio:** {gold_now/spx_now if spx_now > 0 else 0:.4f}")
+
+        with st.expander("🏦 Yield Curve & Interest Rates", expanded=True):
+            st.write(f"**US Prime Rate:** 6.75% (Effective Dec 2025)")
+            st.write(f"**10-Year Benchmark:** {tnx_now:.2f}%")
+            st.write(f"**10Y/3M Spread:** {tnx_now - short_rate:.2f}%")
+
+        with st.expander("📜 Fiscal Policy & Treasury Issuance", expanded=True):
+            st.write("**Recent QRA:** Treasury offering $125B in securities (Feb 2026).")
+            st.write("**Liquidity Summary:** Treasury shifting more issuance into 'Coupons.'")
 
     st.divider()
 
@@ -220,32 +259,25 @@ with tab_alpha:
     *Target: Top 10 Niche/Small-Cap trades. Older trades are filtered out as new filings are detected.*
     """)
 
-    # --- HYBRID API + CACHE AGENT LOGIC ---
-    @st.cache_data(ttl=3600) # Hourly refresh
+    @st.cache_data(ttl=3600)
     def get_hybrid_trades(api_key):
-        # 1. Base "Persistent Memory" for when API has no new niche results
         persistent_memory = [
-            {"Politician": "Tim Moore (R)", "Ticker": "GNPX", "Company": "Genprex, Inc.", "Date": "2026-02-05", "Amount": "$1,001 - $15,000", "Insight": "🔴 Micro-cap Biotech (<$10M cap)."},
-            {"Politician": "Jonathan Jackson (D)", "Ticker": "GEV", "Company": "GE Vernova Inc.", "Date": "2026-01-30", "Amount": "$15,001 - $50,000", "Insight": "🟠 Infrastructure Spin-off. Non-index."},
-            {"Politician": "Tim Moore (R)", "Ticker": "SMPL", "Company": "Simply Good Foods", "Date": "2026-02-11", "Amount": "$15,001 - $50,000", "Insight": "⚪ Specialized nutritional brands."},
-            {"Politician": "Michael Guest (R)", "Ticker": "CHRD", "Company": "Chord Energy", "Date": "2026-01-09", "Amount": "$1,001 - $15,000", "Insight": "⚪ Localized shale oil producer."},
-            {"Politician": "Tim Moore (R)", "Ticker": "DNUT", "Company": "Krispy Kreme Inc.", "Date": "2026-02-12", "Amount": "$1,001 - $15,000", "Insight": "⚪ Specific brand-heavy consumer pick."}
+            {"Politician": "Tim Moore (R)", "Ticker": "GNPX", "Company": "Genprex, Inc.", "Date": "2026-02-05", "Amount": "$1k-$15k", "Rationale": "🔴 Micro-cap Biotech (<$10M)"},
+            {"Politician": "Jonathan Jackson (D)", "Ticker": "GEV", "Company": "GE Vernova Inc.", "Date": "2026-01-30", "Amount": "$15k-$50k", "Rationale": "🟠 Infrastructure Spin-off"},
+            {"Politician": "Tim Moore (R)", "Ticker": "SMPL", "Company": "Simply Good Foods", "Date": "2026-02-11", "Amount": "$15k-$50k", "Rationale": "⚪ Niche Consumer Brand"},
+            {"Politician": "Michael Guest (R)", "Ticker": "CHRD", "Company": "Chord Energy", "Date": "2026-01-09", "Amount": "$1k-$15k", "Rationale": "⚪ Localized Shale Play"},
+            {"Politician": "Tim Moore (R)", "Ticker": "DNUT", "Company": "Krispy Kreme Inc.", "Date": "2026-02-12", "Amount": "$1k-$15k", "Rationale": "⚪ Specific Brand Bet"}
         ]
         
         try:
-            # 2. Fetch Latest Filings
             h_url = f"https://financialmodelingprep.com/api/v3/house-disclosure?apikey={api_key}"
             s_url = f"https://financialmodelingprep.com/api/v3/senate-disclosure?apikey={api_key}"
+            live_data = requests.get(h_url).json() + requests.get(s_url).json()
             
-            h_data = requests.get(h_url).json()
-            s_data = requests.get(senate_url).json()
-            all_raw = (h_data if isinstance(h_data, list) else []) + (s_data if isinstance(s_data, list) else [])
-            
-            # Filter Logic: Exclude Mega-Caps & Broad S&P 500 names
-            mega_caps = ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "TSLA", "META", "BRK.B", "V", "JPM", "WMT"]
+            mega_caps = ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "TSLA", "META", "JPM", "V", "BRK.B"]
             
             live_unusual = []
-            for t in all_raw[:60]: # Scan recent 60
+            for t in live_data[:50]:
                 sym = t.get('symbol', 'N/A')
                 if sym not in mega_caps and sym != 'N/A' and len(sym) < 6:
                     live_unusual.append({
@@ -254,35 +286,20 @@ with tab_alpha:
                         "Company": t.get('assetDescription', 'N/A')[:35] + "...",
                         "Date": t.get('transactionDate', 'N/A'),
                         "Amount": t.get('amount', 'N/A'),
-                        "Insight": "🟠 Live Niche Filing Detected"
+                        "Rationale": "🟠 Live Niche Filing"
                     })
             
-            # 3. Merge, Clean, and Truncate to Top 10
-            combined_df = pd.DataFrame(live_unusual + persistent_memory)
-            # Drop duplicates based on Politician + Ticker
-            combined_df = combined_df.drop_duplicates(subset=['Politician', 'Ticker'], keep='first')
-            # Sort by Date descending
-            combined_df = combined_df.sort_values(by="Date", ascending=False)
-            return combined_df.head(10)
-            
+            combined = pd.DataFrame(live_unusual + persistent_memory)
+            combined = combined.drop_duplicates(subset=['Politician', 'Ticker']).sort_values(by="Date", ascending=False)
+            return combined.head(10)
         except:
             return pd.DataFrame(persistent_memory)
 
-    # --- API KEY INTEGRATED ---
     FMP_API_KEY = "6sG3kEmPzwx6pzFxdyarM7weg4jvSEFw"
+    df_alpha = get_hybrid_trades(FMP_API_KEY)
     
-    final_trades = get_hybrid_trades(FMP_API_KEY)
-    
-    if not final_trades.empty:
-        st.dataframe(
-            final_trades, 
-            use_container_width=True, 
-            hide_index=True,
-            column_config={"Insight": st.column_config.TextColumn("Agent Rationale", width="large")}
-        )
-    else:
-        st.info("Agent is scanning for new unusual niche filings...")
+    st.dataframe(df_alpha, use_container_width=True, hide_index=True)
 
     st.divider()
     st.subheader("🚨 Significant Macro Exit Alerts")
-    st.warning("**Agent Update:** Monitoring for liquidations over $1M (e.g., [Dave McCormick/GS](https://market-agent-vinovkctutaoxrxbkk3lrp.streamlit.app/)) in primary sector leaders to identify institutional distribution.")
+    st.warning("**Agent Update:** Monitoring for $1M+ liquidations (e.g., [Dave McCormick/GS](https://market-agent-vinovkctutaoxrxbkk3lrp.streamlit.app/)) to identify institutional distribution.")

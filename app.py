@@ -2,12 +2,13 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import feedparser
+import requests
 from datetime import datetime
 
 # PAGE CONFIG
 st.set_page_config(page_title="Multi-Asset Terminal", layout="wide")
 
-# --- PORTFOLIO DEFINITIONS ---
+# --- PORTFOLIO DEFINITIONS (Restored Full List) ---
 PORTFOLIOS = {
     "All-Weather (Dalio)": {"VTI": 0.30, "TLT": 0.40, "IEF": 0.15, "GLD": 0.075, "DBC": 0.075},
     "60/40 Portfolio": {"VTI": 0.60, "BND": 0.40},
@@ -21,39 +22,13 @@ PORTFOLIOS = {
     "Global Asset Allocation": {"VTI": 0.18, "VEA": 0.135, "VWO": 0.045, "LQD": 0.18, "TLT": 0.18, "GLD": 0.10, "DBC": 0.10, "VNQ": 0.08}
 }
 
-# --- DATA MINING FUNCTIONS ---
-@st.cache_data(ttl=600) 
-def get_safe_data(ticker):
-    try:
-        d = yf.download(ticker, period="5d", progress=False)
-        return d['Close'].dropna().iloc[-1].item() if not d.empty else 0.0
-    except: return 0.0
-
-@st.cache_data(ttl=600)
-def calculate_rsi(ticker, period="1d", window=14):
-    try:
-        hp, iv = ("60d", "1d") if period == "1d" else ("2y", "1wk")
-        df = yf.download(ticker, period=hp, interval=iv, progress=False)
-        delta = df['Close'].diff()
-        gain = (delta.where(delta > 0, 0)).rolling(window=window).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(window=window).mean()
-        rsi = 100 - (100 / (1 + (gain / loss)))
-        return rsi.iloc[-1].item()
-    except: return 50.0
-
-@st.cache_data(ttl=600)
-def get_sma(ticker, window):
-    try:
-        d = yf.download(ticker, period="2y", progress=False)
-        return d['Close'].rolling(window=window).mean().iloc[-1].item()
-    except: return 0.0
-
-@st.cache_data(ttl=300)
-def get_news_feed(url, limit=5):
-    try:
-        feed = feedparser.parse(url)
-        return [{"title": e.title, "link": e.link} for e in feed.entries[:limit]]
-    except: return []
+# --- SIDEBAR ---
+with st.sidebar:
+    st.header("⚙️ Terminal Controls")
+    if st.button("🔄 Refresh Market Data"):
+        st.cache_data.clear()
+        st.rerun()
+    st.info("Manual refresh clears the cache and pulls the latest data.")
 
 # --- 1. TABS NAVIGATION (Congressional Alpha Removed) ---
 tab_terminal, tab_lab = st.tabs(["🛡️ Multi-Asset Terminal", "📈 Portfolio Lab"])
@@ -62,7 +37,74 @@ with tab_terminal:
     st.title("🛡️ Multi-Asset Terminal")
     st.subheader("Global Asset Intel | G.A.I. Multi-Asset Overlay")
 
-    # FETCH CORE DATA
+    # --- DATA MINING FUNCTIONS (Restored Original Detailed Logic) ---
+    @st.cache_data(ttl=600) 
+    def get_safe_data(ticker):
+        try:
+            d = yf.download(ticker, period="5d", progress=False)
+            if not d.empty:
+                return d['Close'].dropna().iloc[-1].item()
+            return 0.0
+        except: return 0.0
+
+    @st.cache_data(ttl=600)
+    def calculate_rsi(ticker, period="1d", window=14):
+        try:
+            hp, iv = ("60d", "1d") if period == "1d" else ("2y", "1wk")
+            df = yf.download(ticker, period=hp, interval=iv, progress=False)
+            delta = df['Close'].diff()
+            gain = (delta.where(delta > 0, 0)).rolling(window=window).mean()
+            loss = (-delta.where(delta < 0, 0)).rolling(window=window).mean()
+            rs = gain / loss
+            rsi = 100 - (100 / (1 + rs))
+            return rsi.iloc[-1].item()
+        except: return 50.0
+
+    @st.cache_data(ttl=600)
+    def get_sma(ticker, window):
+        try:
+            d = yf.download(ticker, period="2y", progress=False)
+            return d['Close'].rolling(window=window).mean().iloc[-1].item()
+        except: return 0.0
+
+    @st.cache_data(ttl=300)
+    def get_news_feed(url, limit=5):
+        try:
+            feed = feedparser.parse(url)
+            return [{"title": e.title, "link": e.link} for e in feed.entries[:limit]]
+        except: return []
+
+    @st.cache_data(ttl=600)
+    def get_sector_leaderboard():
+        sectors = {
+            "XLC": "Comm Services", "XLY": "Consumer Disc", "XLP": "Consumer Staples",
+            "XLE": "Energy", "XLF": "Financials", "XLV": "Health Care",
+            "XLI": "Industrials", "XLB": "Materials", "XLRE": "Real Estate",
+            "XLK": "Technology", "XLU": "Utilities"
+        }
+        tickers = list(sectors.keys())
+        try:
+            data = yf.download(tickers, period="max", progress=False)['Close']
+            sector_rsis = {t: calculate_rsi(t, "1d") for t in tickers}
+            daily = ((data.iloc[-1] / data.iloc[-2]) - 1) * 100
+            weekly = ((data.iloc[-1] / data.iloc[-6]) - 1) * 100
+            monthly = ((data.iloc[-1] / data.iloc[-21]) - 1) * 100
+            current_year = datetime.now().year
+            ytd_start = data[data.index >= f"{current_year}-01-01"].iloc[0]
+            ytd = ((data.iloc[-1] / ytd_start) - 1) * 100
+            
+            def get_ranks(series):
+                sorted_s = series.sort_values(ascending=False)
+                top5 = sorted_s.head(5)
+                bot5 = sorted_s.tail(5).sort_values(ascending=True)
+                t_list = [f"{sectors[t]}: {v:+.1f}% (RSI: {sector_rsis[t]:.1f})" for t, v in top5.items()]
+                b_list = [f"{sectors[t]}: {v:+.1f}% (RSI: {sector_rsis[t]:.1f})" for t, v in bot5.items()]
+                return t_list, b_list
+
+            return get_ranks(daily), get_ranks(weekly), get_ranks(monthly), get_ranks(ytd), sector_rsis, sectors
+        except: return ([],[]),([],[]),([],[]),([],[]), {}, {}
+
+    # --- FETCH CORE DATA ---
     spx_now = get_safe_data("^GSPC")
     vix_now = get_safe_data("^VIX")
     tnx_now = get_safe_data("^TNX")
@@ -103,7 +145,28 @@ with tab_terminal:
 
     st.divider()
 
-    # --- NEWS FEEDS ---
+    # --- SECTOR PERFORMANCE & RSI HEATMAP (FULLY RESTORED) ---
+    daily_data, weekly_data, monthly_data, ytd_data, s_rsis, s_names = get_sector_leaderboard()
+    if s_rsis:
+        st.subheader("📊 Sector Performance & RSI Heatmap")
+        heat_cols = st.columns(11)
+        for i, (t, r) in enumerate(s_rsis.items()):
+            c = "🔴" if r > 70 else ("🔵" if r < 30 else "⚪")
+            heat_cols[i].metric(s_names[t], f"{r:.0f}", c)
+        
+        st.write("---")
+        l_cols = st.columns(4)
+        timeframes = [("Daily", daily_data), ("Weekly", weekly_data), ("Monthly", monthly_data), ("Year-to-Date", ytd_data)]
+        for i, (name, data) in enumerate(timeframes):
+            with l_cols[i]:
+                st.write(f"**{name} Leaders**")
+                for item in data[0]: st.write(f"🟢 {item}")
+                st.write(f"**{name} Laggards**")
+                for item in data[1]: st.write(f"🔴 {item}")
+
+    st.divider()
+
+    # --- GEOPOLITICAL & NEWS ---
     geo_left, geo_right = st.columns(2)
     with geo_left:
         st.write("**🌍 Global Headlines (BBC)**")
@@ -114,11 +177,9 @@ with tab_terminal:
         for e in get_news_feed("https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114") or []:
             st.markdown(f"- [{e['title']}]({e['link']})")
 
-# --- TAB 2: PORTFOLIO LAB (FULLY RESTORED & COMPLETED) ---
+# --- TAB 2: PORTFOLIO LAB (FULLY RESTORED) ---
 with tab_lab:
     st.header("📈 Lazy Portfolio Performance Lab")
-    st.caption("Real-time Tracking of Year-to-Date (YTD) Performance")
-    
     all_p_tickers = list(set([t for p in PORTFOLIOS.values() for t in p.keys()]))
     
     @st.cache_data(ttl=3600)
@@ -138,24 +199,8 @@ with tab_lab:
     if prices:
         perf_results = []
         for name, weights in PORTFOLIOS.items():
-            try:
-                # Weighted return calculation
-                ytd_return = sum(((prices[t]["current"]/prices[t]["start"]) - 1) * w for t, w in weights.items() if t in prices)
-                perf_results.append({
-                    "Portfolio Design": name,
-                    "Tickers": ", ".join(weights.keys()),
-                    "YTD %": round(ytd_return * 100, 2)
-                })
-            except: continue
+            ytd_return = sum(((prices[t]["current"]/prices[t]["start"]) - 1) * w for t, w in weights.items() if t in prices)
+            perf_results.append({"Portfolio Design": name, "Tickers": ", ".join(weights.keys()), "YTD %": round(ytd_return * 100, 2)})
         
         df_perf = pd.DataFrame(perf_results).sort_values(by="YTD %", ascending=False)
         st.dataframe(df_perf, use_container_width=True, hide_index=True)
-        
-        # Summary Metrics
-        st.divider()
-        m1, m2, m3 = st.columns(3)
-        m1.metric("YTD Leader", df_perf.iloc[0]["Portfolio Design"], f"{df_perf.iloc[0]['YTD %']}%")
-        m2.metric("60/40 Benchmark", "Balanced", f"{df_perf[df_perf['Portfolio Design']=='60/40 Portfolio']['YTD %'].values[0]}%")
-        m3.metric("YTD Laggard", df_perf.iloc[-1]["Portfolio Design"], f"{df_perf.iloc[-1]['YTD %']}%")
-    else:
-        st.warning("Awaiting market data for YTD performance calculation...")

@@ -28,157 +28,104 @@ with st.sidebar:
     if st.button("🔄 Refresh Market Data"):
         st.cache_data.clear()
         st.rerun()
-    st.info("Manual refresh clears the cache and pulls the latest prices from Yahoo Finance.")
-    
+    st.info("Manual refresh clears the cache and pulls the latest data.")
+
+# --- DATA MINING FUNCTIONS ---
+@st.cache_data(ttl=600) 
+def get_safe_data(ticker):
+    try:
+        d = yf.download(ticker, period="5d", progress=False)
+        return d['Close'].dropna().iloc[-1].item() if not d.empty else 0.0
+    except: return 0.0
+
+@st.cache_data(ttl=600)
+def calculate_rsi(ticker, period="1d", window=14):
+    try:
+        hp = "60d" if period == "1d" else "2y"
+        iv = "1d" if period == "1d" else "1wk"
+        df = yf.download(ticker, period=hp, interval=iv, progress=False)
+        delta = df['Close'].diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=window).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=window).mean()
+        rs = gain / loss
+        rsi = 100 - (100 / (1 + rs))
+        return rsi.iloc[-1].item()
+    except: return 50.0
+
+@st.cache_data(ttl=600)
+def get_sma(ticker, window):
+    try:
+        d = yf.download(ticker, period="2y", progress=False)
+        return d['Close'].rolling(window=window).mean().iloc[-1].item()
+    except: return 0.0
+
+@st.cache_data(ttl=300)
+def get_news_feed(url, limit=5):
+    try:
+        feed = feedparser.parse(url)
+        return [{"title": e.title, "link": e.link} for e in feed.entries[:limit]]
+    except: return []
+
 # --- 1. TABS NAVIGATION ---
 tab_terminal, tab_alpha, tab_lab = st.tabs(["🛡️ Multi-Asset Terminal", "🕵️ Unusual Congressional Alpha", "📈 Portfolio Lab"])
 
+# --- TAB 1: TERMINAL ---
 with tab_terminal:
     st.title("🛡️ Multi-Asset Terminal")
-    st.subheader("Global Asset Intel | G.A.I. Multi-Asset Overlay")
+    st.subheader("Global Asset Intel | Automated Macro Overlay")
 
-    # --- DATA MINING FUNCTIONS ---
-    @st.cache_data(ttl=600) 
-    def get_safe_data(ticker):
-        try:
-            d = yf.download(ticker, period="5d", progress=False)
-            if not d.empty:
-                return d['Close'].dropna().iloc[-1].item()
-            return 0.0
-        except:
-            return 0.0
-
-    @st.cache_data(ttl=600)
-    def calculate_rsi(ticker, period="1d", window=14):
-        try:
-            hp = "60d" if period == "1d" else "2y"
-            iv = "1d" if period == "1d" else "1wk"
-            df = yf.download(ticker, period=hp, interval=iv, progress=False)
-            delta = df['Close'].diff()
-            gain = (delta.where(delta > 0, 0)).rolling(window=window).mean()
-            loss = (-delta.where(delta < 0, 0)).rolling(window=window).mean()
-            rs = gain / loss
-            rsi = 100 - (100 / (1 + rs))
-            return rsi.iloc[-1].item()
-        except:
-            return 50.0
-
-    @st.cache_data(ttl=600)
-    def get_sma(ticker, window):
-        try:
-            d = yf.download(ticker, period="2y", progress=False)
-            return d['Close'].rolling(window=window).mean().iloc[-1].item()
-        except:
-            return 0.0
-
-    @st.cache_data(ttl=300)
-    def get_news_feed(url, limit=5):
-        try:
-            feed = feedparser.parse(url)
-            return [{"title": e.title, "link": e.link} for e in feed.entries[:limit]]
-        except:
-            return []
-
-    @st.cache_data(ttl=600)
-    def get_sector_leaderboard():
-        sectors = {
-            "XLC": "Comm Services", "XLY": "Consumer Disc", "XLP": "Consumer Staples",
-            "XLE": "Energy", "XLF": "Financials", "XLV": "Health Care",
-            "XLI": "Industrials", "XLB": "Materials", "XLRE": "Real Estate",
-            "XLK": "Technology", "XLU": "Utilities"
-        }
-        tickers = list(sectors.keys())
-        try:
-            data = yf.download(tickers, period="max", progress=False)['Close']
-            sector_rsis = {t: calculate_rsi(t, "1d") for t in tickers}
-            daily = ((data.iloc[-1] / data.iloc[-2]) - 1) * 100
-            weekly = ((data.iloc[-1] / data.iloc[-6]) - 1) * 100
-            monthly = ((data.iloc[-1] / data.iloc[-21]) - 1) * 100
-            current_year = datetime.now().year
-            ytd_start = data[data.index >= f"{current_year}-01-01"].iloc[0]
-            ytd = ((data.iloc[-1] / ytd_start) - 1) * 100
-            
-            def get_ranks(series):
-                sorted_s = series.sort_values(ascending=False)
-                top5 = sorted_s.head(5)
-                bot5 = sorted_s.tail(5).sort_values(ascending=True)
-                t_list = [f"{sectors[t]}: {v:+.1f}% (RSI: {sector_rsis[t]:.1f})" for t, v in top5.items()]
-                b_list = [f"{sectors[t]}: {v:+.1f}% (RSI: {sector_rsis[t]:.1f})" for t, v in bot5.items()]
-                return t_list, b_list
-
-            return get_ranks(daily), get_ranks(weekly), get_ranks(monthly), get_ranks(ytd), sector_rsis, sectors
-        except:
-            err = ["Data Pending"]*5
-            return (err, err), (err, err), (err, err), (err, err), {}, {}
-
-    # --- FETCH CORE DATA ---
+    # Fetch Core Data
     spx_now = get_safe_data("^GSPC")
-    qqq_now = get_safe_data("QQQ")
-    vxus_now = get_safe_data("VXUS")
+    sma_200d = get_sma("^GSPC", 200)
     vix_now = get_safe_data("^VIX")
     tnx_now = get_safe_data("^TNX")
+    tnx_200ma = get_sma("^TNX", 200)
     short_rate = get_safe_data("^IRX")
-    dxy_now = get_safe_data("DX-Y.NYB")
-    btc_now = get_safe_data("BTC-USD")
     gold_now = get_safe_data("GC=F")
     dbc_now = get_safe_data("DBC")
     xlb_now = get_safe_data("XLB")
-
-    # --- INDICATORS ---
-    sma_200d = get_sma("^GSPC", 200)
-    tnx_200ma = get_sma("^TNX", 200)
+    btc_now = get_safe_data("BTC-USD")
     btc_200ma = get_sma("BTC-USD", 200)
-    spx_rsi_d = calculate_rsi("^GSPC")
-    spx_rsi_w = calculate_rsi("^GSPC", "1wk")
-    qqq_rsi_d = calculate_rsi("QQQ")
-    vxus_rsi_d = calculate_rsi("VXUS")
-    avg_rsi = (spx_rsi_d + qqq_rsi_d + vxus_rsi_d) / 3
+    dxy_now = get_safe_data("DX-Y.NYB")
 
     # --- 6 PILLARS OVERLAY (FULLY AUTOMATED) ---
     cols = st.columns(6)
     
-    # 1. Momentum (Auto via Price vs 200D MA)
-    if sma_200d > 0:
-        mom_status = "BULLISH" if spx_now > sma_200d else "BEARISH"
-        mom_color = "🟢" if spx_now > sma_200d else "🔴"
-        mom_val = ((spx_now/sma_200d)-1)*100
-    else:
-        mom_status, mom_color, mom_val = "DATA PENDING", "⚪", 0.0
-    cols[0].metric("Momentum", f"{mom_color} {mom_status}", f"{mom_val:+.1f}% vs 200D")
+    # Momentum
+    mom_status = "BULLISH" if spx_now > sma_200d else "BEARISH"
+    mom_color = "🟢" if mom_status == "BULLISH" else "🔴"
+    cols[0].metric("Momentum", f"{mom_color} {mom_status}", f"{((spx_now/sma_200d)-1)*100:+.1f}% vs 200D")
 
-    # 2. Inflation (Automated via Gold/Commodity Pressure)
+    # Inflation (Gold/Commodity pressure)
     inf_ratio = gold_now / dbc_now if dbc_now > 0 else 0
     inf_status = "🔴 HIGH" if inf_ratio > 1.1 else "🟢 STABLE"
     cols[1].metric("Inflation", inf_status, "Gold/DBC Pressure")
 
-    # 3. Growth (Automated via Copper/Gold proxy: XLB/GLD)
+    # Growth (Materials vs Gold)
     growth_ratio = xlb_now / gold_now if gold_now > 0 else 0
     growth_status = "🟢 EXPAND" if growth_ratio > 0.015 else "🟡 SLOWING"
     cols[2].metric("Growth", growth_status, "Materials vs Gold")
     
-    # 4. Positioning (Automated via VIX Thresholds)
-    if vix_now > 30:
-        pos_status = "🔴 HEAVY"
-    elif vix_now > 20:
-        pos_status = "🟡 NEUTRAL"
-    else:
-        pos_status = "🟢 LITE"
+    # Positioning (VIX)
+    pos_status = "🔴 HEAVY" if vix_now > 30 else "🟡 NEUTRAL" if vix_now > 20 else "🟢 LITE"
     cols[3].metric("Positioning", pos_status, f"VIX {vix_now:.1f}")
 
-    # 5. Monetary (Automated via Yield Curve Spread 10Y-3M)
-    curve_spread = tnx_now - short_rate
-    mon_status = "🔴 TIGHT" if curve_spread < 0 else "🟢 EASING"
-    cols[4].metric("Monetary", mon_status, f"Spread: {curve_spread:.2f}%")
+    # Monetary (10Y-3M Spread)
+    spread = tnx_now - short_rate
+    mon_status = "🔴 TIGHT" if spread < 0 else "🟢 EASING"
+    cols[4].metric("Monetary", mon_status, f"Spread: {spread:.2f}%")
 
-    # 6. Fiscal (Automated via 10Y Yield Momentum)
+    # Fiscal (Yield Momentum)
     fisc_status = "🔴 STRESS" if tnx_now > tnx_200ma * 1.1 else "🟢 STABLE"
     cols[5].metric("Fiscal", fisc_status, "Yield vs 200D MA")
 
     st.divider()
 
-    # --- ASSET CLASS SCORECARD ---
+    # --- SCORECARD ---
     st.subheader("🎯 Asset Class Scorecard")
     s_cols = st.columns(5)
+    avg_rsi = (calculate_rsi("^GSPC") + calculate_rsi("QQQ") + calculate_rsi("VXUS")) / 3
+    
     def get_rating(green_cond, red_cond):
         if green_cond: return "🟢 BULLISH"
         if red_cond: return "🔴 BEARISH"
@@ -192,97 +139,59 @@ with tab_terminal:
 
     st.divider()
 
-    # --- MARKET TEMPERATURE ---
-    st.subheader("🌡️ Market Temperature & Sentiment Gauge")
-    if avg_rsi > 70: status, color = "EXTREME GREED / OVERBOUGHT", "🔴"
-    elif avg_rsi > 60: status, color = "GREED", "🟠"
-    elif avg_rsi < 30: status, color = "EXTREME FEAR / OVERSOLD", "🔵"
-    elif avg_rsi < 40: status, color = "FEAR", "🟡"
-    else: status, color = "NEUTRAL", "🟢"
-    st.markdown(f"### {color} Current Regime: **{status}** (Avg RSI: {avg_rsi:.1f})")
-
-    st.divider()
-
-    # --- SECTOR PERFORMANCE ---
-    daily_data, weekly_data, monthly_data, ytd_data, s_rsis, s_names = get_sector_leaderboard()
-    if s_rsis:
-        st.subheader("📊 Sector Performance & RSI Heatmap")
-        heat_cols = st.columns(11)
-        for i, (t, r) in enumerate(s_rsis.items()):
-            c = "🔴" if r > 70 else ("🔵" if r < 30 else "⚪")
-            heat_cols[i].metric(s_names[t], f"{r:.0f}", c)
-        st.caption("RSI Heatmap Key: 🔴 Overbought (>70) | 🔵 Oversold (<30) | ⚪ Neutral")
-
-    st.write("---")
-    l_cols = st.columns(4)
-    timeframes = [("Daily", daily_data), ("Weekly", weekly_data), ("Monthly", monthly_data), ("Year-to-Date", ytd_data)]
-    for i, (name, data) in enumerate(timeframes):
-        with l_cols[i]:
-            st.write(f"**{name} Leaders**")
-            for item in data[0]: st.write(f"🟢 {item}")
-            st.write(f"**{name} Laggards**")
-            for item in data[1]: st.write(f"🔴 {item}")
-
-    st.divider()
-
-    # --- DEEP DIVES ---
-    col_left, col_right = st.columns(2)
-    with col_left:
-        with st.expander("🔍 Momentum & Trend Layers (SPX, QQQ, VXUS)", expanded=True):
-            c1, c2, c3 = st.columns(3)
-            with c1:
-                st.write("**S&P 500 (SPX)**")
-                st.write(f"Price: {spx_now:,.2f}")
-                st.write(f"Daily RSI: {spx_rsi_d:.1f} | Weekly: {spx_rsi_w:.1f}")
-                st.write(f"200-MA: {sma_200d:,.2f}")
-            with c2:
-                st.write("**Nasdaq (QQQ)**")
-                st.write(f"Price: {qqq_now:,.2f}")
-                st.write(f"Daily RSI: {qqq_rsi_d:.1f}")
-            with c3:
-                st.write("**International (VXUS)**")
-                st.write(f"Price: {vxus_now:,.2f}")
-                st.write(f"Daily RSI: {vxus_rsi_d:.1f}")
-
-        with st.expander("₿ Crypto Intelligence Agent (BTC, ETH, SOL)", expanded=True):
-            cryptos = {"Bitcoin (BTC)": "BTC-USD", "Ethereum (ETH)": "ETH-USD", "Solana (SOL)": "SOL-USD"}
-            c_cols = st.columns(3)
-            for i, (name, ticker) in enumerate(cryptos.items()):
-                p = get_safe_data(ticker)
-                dr = calculate_rsi(ticker)
-                with c_cols[i]:
-                    st.write(f"**{name}**")
-                    st.write(f"Price: ${p:,.2f}")
-                    st.write(f"RSI: {dr:.1f}")
-
-    with col_right:
-        with st.expander("🌊 Liquidity Watch Agent", expanded=True):
-            st.write(f"**Dollar Index (DXY):** {dxy_now:.2f}")
-
-        with st.expander("✨ Gold Intelligence Agent", expanded=True):
-            st.write(f"**Current Gold Price:** ${gold_now:,.2f}")
-            st.write(f"**Gold/SPX Ratio:** {gold_now/spx_now if spx_now > 0 else 0:.4f}")
-
-        with st.expander("🏦 Yield Curve & Interest Rates", expanded=True):
-            st.write(f"**10-Year Benchmark:** {tnx_now:.2f}%")
-            st.write(f"**10Y/3M Spread:** {tnx_now - short_rate:.2f}%")
-
-    st.divider()
-
-    # --- GEOPOLITICAL AGENT ---
-    st.subheader("🌍 Geopolitical Intelligence Agent (Live Feed)")
-    geo_left, geo_right = st.columns(2)
-    with geo_left:
+    # --- GEOPOLITICAL FEEDS ---
+    g_left, g_right = st.columns(2)
+    with g_left:
         st.write("**🌍 Global Headlines (BBC)**")
-        wn = get_news_feed("https://feeds.bbci.co.uk/news/world/rss.xml")
-        for e in wn or []: st.markdown(f"- [{e['title']}]({e['link']})")
-    with geo_right:
+        for e in get_news_feed("https://feeds.bbci.co.uk/news/world/rss.xml") or []:
+            st.markdown(f"- [{e['title']}]({e['link']})")
+    with g_right:
         st.write("**💰 Finance Headlines (CNBC)**")
-        cn = get_news_feed("https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114")
-        for e in cn or []: st.markdown(f"- [{e['title']}]({e['link']})")
+        for e in get_news_feed("https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114") or []:
+            st.markdown(f"- [{e['title']}]({e['link']})")
 
-# --- ALPHA & LAB ---
+# --- TAB 2: CONGRESSIONAL ALPHA ---
 with tab_alpha:
     st.header("🕵️ Unusual Congressional Alpha Agent (Live)")
+    st.markdown("*Target: Top 10 Niche/Small-Cap trades from live filings.*")
+
+    @st.cache_data(ttl=3600)
+    def get_hybrid_trades(api_key):
+        persistent_memory = [
+            {"Politician": "Tim Moore (R)", "Ticker": "GNPX", "Company": "Genprex, Inc.", "Date": "2026-02-05", "Amount": "$1k-$15k", "Rationale": "🔴 Micro-cap Biotech"},
+            {"Politician": "Jonathan Jackson (D)", "Ticker": "GEV", "Company": "GE Vernova Inc.", "Date": "2026-01-30", "Amount": "$15k-$50k", "Rationale": "🟠 Infrastructure"},
+            {"Politician": "Michael Guest (R)", "Ticker": "CHRD", "Company": "Chord Energy", "Date": "2026-01-09", "Amount": "$1k-$15k", "Rationale": "⚪ Energy Play"}
+        ]
+        try:
+            h_url = f"https://financialmodelingprep.com/api/v3/house-disclosure?apikey={api_key}"
+            live_data = requests.get(h_url).json()
+            live_unusual = [{"Politician": f"{t.get('firstName')} {t.get('lastName')}", "Ticker": t.get('symbol'), "Company": t.get('assetDescription')[:35], "Date": t.get('transactionDate'), "Amount": t.get('amount'), "Rationale": "🟠 Live Filing"} for t in live_data[:20] if len(t.get('symbol', '')) < 6]
+            return pd.DataFrame(live_unusual + persistent_memory).drop_duplicates(subset=['Politician', 'Ticker']).head(10)
+        except: return pd.DataFrame(persistent_memory)
+
+    df_alpha = get_hybrid_trades("6sG3kEmPzwx6pzFxdyarM7weg4jvSEFw")
+    st.dataframe(df_alpha, use_container_width=True, hide_index=True)
+
+# --- TAB 3: PORTFOLIO LAB ---
 with tab_lab:
     st.header("📈 Lazy Portfolio Performance Lab")
+    all_p_tickers = list(set([t for p in PORTFOLIOS.values() for t in p.keys()]))
+    
+    @st.cache_data(ttl=3600)
+    def get_ytd_portfolio_data(tickers):
+        prices = {}
+        ytd_start = f"{datetime.now().year}-01-01"
+        for ticker in tickers:
+            try:
+                df = yf.download(ticker, start=ytd_start, progress=False)
+                if not df.empty: prices[ticker] = {"current": df['Close'].iloc[-1].item(), "ytd_start": df['Close'].iloc[0].item()}
+            except: continue
+        return prices
+
+    p_prices = get_ytd_portfolio_data(all_p_tickers)
+    perf_list = []
+    for name, weights in PORTFOLIOS.items():
+        ytd_perf = sum(((p_prices[t]["current"]/p_prices[t]["ytd_start"])-1) * w for t, w in weights.items() if t in p_prices)
+        perf_list.append({"Portfolio Design": name, "Tickers": ", ".join(weights.keys()), "YTD %": round(ytd_perf * 100, 2)})
+    
+    st.dataframe(pd.DataFrame(perf_list).sort_values(by="YTD %", ascending=False), use_container_width=True, hide_index=True)

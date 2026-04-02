@@ -22,6 +22,14 @@ PORTFOLIOS = {
     "Global Asset Allocation": {"VTI": 0.18, "VEA": 0.135, "VWO": 0.045, "LQD": 0.18, "TLT": 0.18, "GLD": 0.10, "DBC": 0.10, "VNQ": 0.08}
 }
 
+# --- SIDEBAR CONTROLS ---
+with st.sidebar:
+    st.header("⚙️ Terminal Controls")
+    if st.button("🔄 Refresh Market Data"):
+        st.cache_data.clear()
+        st.rerun()
+    st.info("Manual refresh clears the cache and pulls the latest prices from Yahoo Finance.")
+    
 # --- 1. TABS NAVIGATION ---
 tab_terminal, tab_alpha, tab_lab = st.tabs(["🛡️ Multi-Asset Terminal", "🕵️ Unusual Congressional Alpha", "📈 Portfolio Lab"])
 

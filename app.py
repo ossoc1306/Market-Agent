@@ -218,6 +218,12 @@ with tab_lab:
     if p_prices:
         res = []
         for name, weights in PORTFOLIOS.items():
+            # Build string for weights display
+            weight_strings = [f"{t}: {int(w*100)}%" for t, w in weights.items()]
             ytd_perf = sum(((p_prices[t]["current"]/p_prices[t]["ytd_start"])-1) * w for t, w in weights.items() if t in p_prices)
-            res.append({"Portfolio": name, "Tickers": ", ".join(weights.keys()), "YTD %": round(ytd_perf * 100, 2)})
+            res.append({
+                "Portfolio Design": name, 
+                "Allocation Weighting": ", ".join(weight_strings),
+                "YTD %": round(ytd_perf * 100, 2)
+            })
         st.dataframe(pd.DataFrame(res).sort_values(by="YTD %", ascending=False), use_container_width=True, hide_index=True)

@@ -123,11 +123,20 @@ with tab_terminal:
     vxus_rsi_d = calculate_rsi("VXUS")
     avg_rsi = (spx_rsi_d + qqq_rsi_d + vxus_rsi_d) / 3
 
-    # --- 6 PILLARS OVERLAY ---
+  # --- 6 PILLARS OVERLAY ---
     cols = st.columns(6)
-    mom_val = ((spx_now/sma_200d)-1)*100 if sma_200d > 0 else 0
-    mom_color = "🟢" if mom_val > 0 else "🔴"
-    cols[0].metric("Momentum", f"{mom_color} BULLISH", f"{mom_val:+.1f}% vs 200D")
+    
+    # Calculate Momentum logic: Bullish if Price > 200D SMA, Bearish otherwise
+    if sma_200d > 0:
+        mom_status = "BULLISH" if spx_now > sma_200d else "BEARISH"
+        mom_color = "🟢" if spx_now > sma_200d else "🔴"
+        mom_pct = ((spx_now / sma_200d) - 1) * 100
+    else:
+        mom_status = "DATA PENDING"
+        mom_color = "⚪"
+        mom_pct = 0.0
+
+    cols[0].metric("Momentum", f"{mom_color} {mom_status}", f"{mom_pct:+.1f}% vs 200D")
     cols[1].metric("Inflation", "🟡 2.40%", "PCE Sticky at 3%")
     cols[2].metric("Growth", "🟡 1.40%", "Q4 Slowdown")
     cols[3].metric("Positioning", "🟢 LITE", f"VIX {vix_now:.1f}")

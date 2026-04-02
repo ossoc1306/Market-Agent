@@ -29,7 +29,7 @@ with st.sidebar:
         st.cache_data.clear()
         st.rerun()
     st.info("Manual refresh clears the cache and pulls the latest prices from Yahoo Finance.")
-
+    
 # --- 1. TABS NAVIGATION ---
 tab_terminal, tab_alpha, tab_lab = st.tabs(["🛡️ Multi-Asset Terminal", "🕵️ Unusual Congressional Alpha", "📈 Portfolio Lab"])
 
@@ -121,9 +121,12 @@ with tab_terminal:
     dxy_now = get_safe_data("DX-Y.NYB")
     btc_now = get_safe_data("BTC-USD")
     gold_now = get_safe_data("GC=F")
+    dbc_now = get_safe_data("DBC")
+    xlb_now = get_safe_data("XLB")
 
     # --- INDICATORS ---
     sma_200d = get_sma("^GSPC", 200)
+    tnx_200ma = get_sma("^TNX", 200)
     btc_200ma = get_sma("BTC-USD", 200)
     spx_rsi_d = calculate_rsi("^GSPC")
     spx_rsi_w = calculate_rsi("^GSPC", "1wk")
@@ -131,10 +134,10 @@ with tab_terminal:
     vxus_rsi_d = calculate_rsi("VXUS")
     avg_rsi = (spx_rsi_d + qqq_rsi_d + vxus_rsi_d) / 3
 
-    # --- 6 PILLARS OVERLAY ---
+    # --- 6 PILLARS OVERLAY (FULLY AUTOMATED) ---
     cols = st.columns(6)
     
-    # Pillar 1: Momentum (Price vs 200D MA)
+    # 1. Momentum (Auto via Price vs 200D MA)
     if sma_200d > 0:
         mom_status = "BULLISH" if spx_now > sma_200d else "BEARISH"
         mom_color = "🟢" if spx_now > sma_200d else "🔴"
@@ -143,22 +146,33 @@ with tab_terminal:
         mom_status, mom_color, mom_val = "DATA PENDING", "⚪", 0.0
     cols[0].metric("Momentum", f"{mom_color} {mom_status}", f"{mom_val:+.1f}% vs 200D")
 
-    # Static Pillars
-    cols[1].metric("Inflation", "🟡 2.40%", "PCE Sticky at 3%")
-    cols[2].metric("Growth", "🟡 1.40%", "Q4 Slowdown")
+    # 2. Inflation (Automated via Gold/Commodity Pressure)
+    inf_ratio = gold_now / dbc_now if dbc_now > 0 else 0
+    inf_status = "🔴 HIGH" if inf_ratio > 1.1 else "🟢 STABLE"
+    cols[1].metric("Inflation", inf_status, "Gold/DBC Pressure")
+
+    # 3. Growth (Automated via Copper/Gold proxy: XLB/GLD)
+    growth_ratio = xlb_now / gold_now if gold_now > 0 else 0
+    growth_status = "🟢 EXPAND" if growth_ratio > 0.015 else "🟡 SLOWING"
+    cols[2].metric("Growth", growth_status, "Materials vs Gold")
     
-    # Pillar 4: Positioning (Automated VIX Thresholds)
+    # 4. Positioning (Automated via VIX Thresholds)
     if vix_now > 30:
-        pos_status, pos_ico = "🔴 HEAVY", "HEAVY"
+        pos_status = "🔴 HEAVY"
     elif vix_now > 20:
-        pos_status, pos_ico = "🟡 NEUTRAL", "NEUTRAL"
+        pos_status = "🟡 NEUTRAL"
     else:
-        pos_status, pos_ico = "🟢 LITE", "LITE"
+        pos_status = "🟢 LITE"
     cols[3].metric("Positioning", pos_status, f"VIX {vix_now:.1f}")
 
-    # Static Pillars
-    cols[4].metric("Monetary", "🟡 6.75%", "Prime Rate")
-    cols[5].metric("Fiscal", "🔴 DEFICIT", "Duration Mix ↑")
+    # 5. Monetary (Automated via Yield Curve Spread 10Y-3M)
+    curve_spread = tnx_now - short_rate
+    mon_status = "🔴 TIGHT" if curve_spread < 0 else "🟢 EASING"
+    cols[4].metric("Monetary", mon_status, f"Spread: {curve_spread:.2f}%")
+
+    # 6. Fiscal (Automated via 10Y Yield Momentum)
+    fisc_status = "🔴 STRESS" if tnx_now > tnx_200ma * 1.1 else "🟢 STABLE"
+    cols[5].metric("Fiscal", fisc_status, "Yield vs 200D MA")
 
     st.divider()
 
@@ -190,9 +204,9 @@ with tab_terminal:
     st.divider()
 
     # --- SECTOR PERFORMANCE ---
-    st.subheader("📊 Sector Performance & RSI Heatmap")
     daily_data, weekly_data, monthly_data, ytd_data, s_rsis, s_names = get_sector_leaderboard()
     if s_rsis:
+        st.subheader("📊 Sector Performance & RSI Heatmap")
         heat_cols = st.columns(11)
         for i, (t, r) in enumerate(s_rsis.items()):
             c = "🔴" if r > 70 else ("🔵" if r < 30 else "⚪")
@@ -224,23 +238,22 @@ with tab_terminal:
             with c2:
                 st.write("**Nasdaq (QQQ)**")
                 st.write(f"Price: {qqq_now:,.2f}")
-                st.write(f"Daily RSI: {qqq_rsi_d:.1f} | Weekly: {calculate_rsi('QQQ', '1wk'):.1f}")
+                st.write(f"Daily RSI: {qqq_rsi_d:.1f}")
             with c3:
                 st.write("**International (VXUS)**")
                 st.write(f"Price: {vxus_now:,.2f}")
-                st.write(f"Daily RSI: {vxus_rsi_d:.1f} | Weekly: {calculate_rsi('VXUS', '1wk'):.1f}")
+                st.write(f"Daily RSI: {vxus_rsi_d:.1f}")
 
         with st.expander("₿ Crypto Intelligence Agent (BTC, ETH, SOL)", expanded=True):
             cryptos = {"Bitcoin (BTC)": "BTC-USD", "Ethereum (ETH)": "ETH-USD", "Solana (SOL)": "SOL-USD"}
             c_cols = st.columns(3)
             for i, (name, ticker) in enumerate(cryptos.items()):
-                price = get_safe_data(ticker)
-                dr = calculate_rsi(ticker, "1d")
-                wr = calculate_rsi(ticker, "1wk")
+                p = get_safe_data(ticker)
+                dr = calculate_rsi(ticker)
                 with c_cols[i]:
                     st.write(f"**{name}**")
-                    st.write(f"Price: ${price:,.2f}")
-                    st.write(f"Daily RSI: {dr:.1f} | Weekly: {wr:.1f}")
+                    st.write(f"Price: ${p:,.2f}")
+                    st.write(f"RSI: {dr:.1f}")
 
     with col_right:
         with st.expander("🌊 Liquidity Watch Agent", expanded=True):
@@ -261,14 +274,14 @@ with tab_terminal:
     geo_left, geo_right = st.columns(2)
     with geo_left:
         st.write("**🌍 Global Headlines (BBC)**")
-        world_news = get_news_feed("https://feeds.bbci.co.uk/news/world/rss.xml")
-        for entry in world_news or []: st.markdown(f"- [{entry['title']}]({entry['link']})")
+        wn = get_news_feed("https://feeds.bbci.co.uk/news/world/rss.xml")
+        for e in wn or []: st.markdown(f"- [{e['title']}]({e['link']})")
     with geo_right:
         st.write("**💰 Finance Headlines (CNBC)**")
-        cnbc_news = get_news_feed("https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114")
-        for entry in cnbc_news or []: st.markdown(f"- [{entry['title']}]({entry['link']})")
+        cn = get_news_feed("https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114")
+        for e in cn or []: st.markdown(f"- [{e['title']}]({e['link']})")
 
-# --- 2. ALPHA & 3. PORTFOLIO LAB (REMAIN SAME) ---
+# --- ALPHA & LAB ---
 with tab_alpha:
     st.header("🕵️ Unusual Congressional Alpha Agent (Live)")
 with tab_lab:

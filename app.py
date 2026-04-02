@@ -8,7 +8,7 @@ from datetime import datetime
 # PAGE CONFIG
 st.set_page_config(page_title="Multi-Asset Terminal", layout="wide")
 
-# --- PORTFOLIO DEFINITIONS (Updated with Rationale & Precise Weights) ---
+# --- PORTFOLIO DEFINITIONS (Precise Weights + Rationale) ---
 PORTFOLIOS = {
     "All-Weather (Dalio)": {
         "weights": {"VTI": 0.30, "TLT": 0.40, "IEF": 0.15, "GLD": 0.075, "DBC": 0.075},
@@ -121,7 +121,7 @@ def get_sector_leaderboard():
         return get_ranks(daily), get_ranks(weekly), get_ranks(monthly), get_ranks(ytd), s_rsis, sectors
     except: return ([],[]),([],[]),([],[]),([],[]), {}, {}
 
-# --- 1. TABS NAVIGATION ---
+# --- TABS ---
 tab_terminal, tab_lab = st.tabs(["🛡️ Multi-Asset Terminal", "📈 Portfolio Lab"])
 
 with tab_terminal:
@@ -168,7 +168,7 @@ with tab_terminal:
 
     st.divider()
 
-    # Sector Analytics
+    # Sector Analytics (Leaderboards + Heatmap)
     daily, weekly, monthly, ytd, s_rsis, s_names = get_sector_leaderboard()
     if s_rsis:
         st.subheader("📊 Sector Performance & RSI Heatmap")
@@ -187,12 +187,12 @@ with tab_terminal:
 
     st.divider()
 
-    # --- DEEP DIVES (BITCOIN, ETH, SOL, DXY, GOLD RESTORED) ---
+    # --- DEEP DIVES (RE-INTEGRATED MOMENTUM, CRYPTO, YIELDS) ---
     col_l, col_r = st.columns(2)
     with col_l:
         with st.expander("🔍 Momentum & Trend Layers (SPX, QQQ, VXUS)", expanded=True):
             st.write(f"**S&P 500 (SPX):** {spx_now:,.2f} | **Nasdaq (QQQ):** {get_safe_data('QQQ'):,.2f}")
-            st.write(f"**Bitcoin:** ${btc_now:,.2f} | **200-MA:** ${get_sma('BTC-USD', 200):,.2f}")
+            st.write(f"**Bitcoin:** {btc_now:,.2f} | **200-MA:** {get_sma('BTC-USD', 200):,.2f}")
 
         with st.expander("₿ Crypto Intelligence Agent (BTC, ETH, SOL)", expanded=True):
             cryptos = {"Bitcoin (BTC)": "BTC-USD", "Ethereum (ETH)": "ETH-USD", "Solana (SOL)": "SOL-USD"}
@@ -240,7 +240,7 @@ with tab_lab:
     if px_data:
         results = []
         for name, data in PORTFOLIOS.items():
-            w_display = [f"{t} ({int(w*100)}%)" for t, w in data["weights"].items()]
+            w_disp = [f"{t} ({int(w*100)}%)" for t, w in data["weights"].items()]
             ret = sum(((px_data[t]["c"]/px_data[t]["s"])-1) * w for t, w in data["weights"].items() if t in px_data)
-            results.append({"Portfolio": name, "YTD %": round(ret*100, 2), "Rationale": data["rationale"], "Tickers & Weights": ", ".join(w_display)})
+            results.append({"Portfolio": name, "YTD %": round(ret*100, 2), "Rationale": data["rationale"], "Tickers & Weights": ", ".join(w_disp)})
         st.dataframe(pd.DataFrame(results).sort_values("YTD %", ascending=False), use_container_width=True, hide_index=True)

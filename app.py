@@ -2,13 +2,12 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import feedparser
-import requests
 from datetime import datetime
 
-# --- 1. PAGE CONFIG ---
+# PAGE CONFIG
 st.set_page_config(page_title="Multi-Asset Terminal", layout="wide")
 
-# --- 2. PORTFOLIO DEFINITIONS (Full Weights + Rationale) ---
+# --- PORTFOLIO DEFINITIONS (Updated with Rationale & Precise Weights) ---
 PORTFOLIOS = {
     "All-Weather (Dalio)": {
         "weights": {"VTI": 0.30, "TLT": 0.40, "IEF": 0.15, "GLD": 0.075, "DBC": 0.075},
@@ -28,7 +27,7 @@ PORTFOLIOS = {
     },
     "No-Brainer (Bernstein)": {
         "weights": {"VOO": 0.25, "IJR": 0.25, "VEA": 0.25, "BND": 0.25},
-        "rationale": "Equal split across US Large, US Small, Intl, and Bonds."
+        "rationale": "Equal split across US Large, US Small, Intl, and Bonds to avoid over-concentration."
     },
     "Permanent Portfolio": {
         "weights": {"VTI": 0.25, "TLT": 0.25, "BIL": 0.25, "GLD": 0.25},
@@ -36,31 +35,38 @@ PORTFOLIOS = {
     },
     "Golden Butterfly": {
         "weights": {"VTI": 0.20, "IJS": 0.20, "TLT": 0.20, "SHV": 0.20, "GLD": 0.20},
-        "rationale": "High-velocity version of Permanent Portfolio with a Small-Cap Value tilt."
+        "rationale": "High-velocity version of the Permanent Portfolio with a Small-Cap Value tilt."
     },
     "Ivy League (Swensen)": {
         "weights": {"VTI": 0.30, "VEA": 0.15, "VWO": 0.05, "VNQ": 0.20, "IEF": 0.15, "TIP": 0.15},
-        "rationale": "Mimics institutional endowment strategies with Real Estate/TIPS."
+        "rationale": "Mimics institutional endowment strategies with heavy Real Estate/TIPS exposure."
     },
     "Global Asset Allocation": {
         "weights": {"VTI": 0.18, "VEA": 0.135, "VWO": 0.045, "LQD": 0.18, "TLT": 0.18, "GLD": 0.10, "DBC": 0.10, "VNQ": 0.08},
-        "rationale": "Meb Faber's strategy covering almost every liquid asset class."
+        "rationale": "A 'buy-the-world' strategy covering almost every liquid asset class."
     },
     "Warren Buffett": {
         "weights": {"VOO": 0.90, "BIL": 0.10},
-        "rationale": "90% S&P 500 growth with 10% cash reserve."
+        "rationale": "Aggressive US-centric bet on S&P 500 compounding with a tiny cash reserve."
     },
     "Coffeehouse": {
         "weights": {"VOO": 0.10, "IJS": 0.10, "IJV": 0.10, "VEA": 0.10, "VNQ": 0.10, "VIG": 0.10, "AGG": 0.40},
-        "rationale": "Diversified equity slices with a heavy bond floor."
+        "rationale": "Diversified equity slices with a heavy bond floor for income and stability."
     },
     "Fugger Portfolio": {
         "weights": {"VTI": 0.25, "VNQ": 0.25, "BND": 0.25, "GLD": 0.25},
-        "rationale": "Historical model split equally across primary assets."
+        "rationale": "Historical wealth preservation model split equally across primary assets."
     }
 }
 
-# --- 3. DATA ENGINES ---
+# --- SIDEBAR ---
+with st.sidebar:
+    st.header("⚙️ Terminal Controls")
+    if st.button("🔄 Refresh Market Data"):
+        st.cache_data.clear()
+        st.rerun()
+
+# --- DATA FUNCTIONS ---
 @st.cache_data(ttl=600) 
 def get_safe_data(ticker):
     try:
@@ -106,20 +112,14 @@ def get_sector_leaderboard():
         return get_ranks(daily), get_ranks(weekly), get_ranks(monthly), get_ranks(ytd), s_rsis, sectors
     except: return ([],[]),([],[]),([],[]),([],[]), {}, {}
 
-# --- 4. SIDEBAR ---
-with st.sidebar:
-    st.header("⚙️ Terminal Controls")
-    if st.button("🔄 Refresh Market Data"):
-        st.cache_data.clear()
-        st.rerun()
-
-# --- 5. TABS ---
+# --- TABS ---
 tab_terminal, tab_lab = st.tabs(["🛡️ Multi-Asset Terminal", "📈 Portfolio Lab"])
 
 with tab_terminal:
     st.title("🛡️ Multi-Asset Terminal")
-    
-    # Core Data Fetch
+    st.subheader("Global Asset Intel | G.A.I. Multi-Asset Overlay")
+
+    # Fetch Core Data
     spx_now = get_safe_data("^GSPC")
     sma_200d = get_sma("^GSPC", 200)
     vix_now = get_safe_data("^VIX")
@@ -128,9 +128,10 @@ with tab_terminal:
     gold_now = get_safe_data("GC=F")
     dbc_now = get_safe_data("DBC")
     xlb_now = get_safe_data("XLB")
+    btc_now = get_safe_data("BTC-USD")
     dxy_now = get_safe_data("DX-Y.NYB")
 
-    # PILLARS
+    # 6 PILLARS
     cols = st.columns(6)
     cols[0].metric("Momentum", f"{'🟢 BULLISH' if spx_now > sma_200d else '🔴 BEARISH'}", f"{((spx_now/sma_200d)-1)*100:+.1f}% vs 200D")
     cols[1].metric("Inflation", f"{'🔴 HIGH' if (gold_now/dbc_now if dbc_now > 0 else 0) > 1.1 else '🟢 STABLE'}", "Gold/DBC Ratio")
@@ -144,26 +145,31 @@ with tab_terminal:
     # Asset Class Scorecard
     sc = st.columns(5)
     rsi_avg = (calculate_rsi("^GSPC") + calculate_rsi("QQQ") + calculate_rsi("VXUS")) / 3
-    sc[0].metric("Stocks", "🟢 BULLISH" if spx_now > sma_200d and rsi_avg < 65 else "🔴 BEARISH")
-    sc[1].metric("Bonds", "🟢 BULLISH" if tnx_now > short_rate else "🔴 BEARISH")
-    sc[2].metric("Gold", "🟢 BULLISH" if gold_now/spx_now > 0.7 else "🔴 BEARISH")
-    sc[3].metric("Crypto", "🟢 BULLISH" if get_safe_data("BTC-USD") > get_sma("BTC-USD", 200) else "🔴 BEARISH")
-    sc[4].metric("Real Estate", "🟢 BULLISH" if calculate_rsi("XLRE") < 40 else "🔴 BEARISH")
+    def get_rating(green_cond, red_cond):
+        if green_cond: return "🟢 BULLISH"
+        if red_cond: return "🔴 BEARISH"
+        return "🟡 NEUTRAL"
+
+    sc[0].metric("Stocks", get_rating(spx_now > sma_200d and rsi_avg < 65, spx_now < sma_200d or rsi_avg > 75))
+    sc[1].metric("Bonds", get_rating(tnx_now > short_rate, tnx_now < short_rate))
+    sc[2].metric("Gold", get_rating(gold_now/spx_now > 0.7 or rsi_avg < 45, dxy_now > 108))
+    sc[3].metric("Crypto", get_rating(btc_now > get_sma("BTC-USD", 200) and dxy_now < 105, btc_now < get_sma("BTC-USD", 200)))
+    sc[4].metric("Real Estate", get_rating(calculate_rsi("XLRE") < 40, calculate_rsi("XLRE") > 70))
 
     st.divider()
 
-    # Sector Leaderboard & Heatmap
+    # Sector Analytics
     daily, weekly, monthly, ytd, s_rsis, s_names = get_sector_leaderboard()
     if s_rsis:
         st.subheader("📊 Sector Performance & RSI Heatmap")
-        h = st.columns(11)
+        heat_cols = st.columns(11)
         for i, (t, r) in enumerate(s_rsis.items()):
-            h[i].metric(s_names[t], f"{r:.0f}", "🔴" if r > 70 else "🔵" if r < 30 else "⚪")
+            heat_cols[i].metric(s_names[t], f"{r:.0f}", "🔴" if r > 70 else "🔵" if r < 30 else "⚪")
         
         st.write("---")
-        l = st.columns(4)
-        for i, (n, d) in enumerate([("Daily", daily), ("Weekly", weekly), ("Monthly", monthly), ("YTD", ytd)]):
-            with l[i]:
+        l_cols = st.columns(4)
+        for i, (n, d) in enumerate([("Daily", daily), ("Weekly", weekly), ("Monthly", monthly), ("Year-to-Date", ytd)]):
+            with l_cols[i]:
                 st.write(f"**{n} Leaders**")
                 for item in d[0]: st.write(f"🟢 {item}")
                 st.write(f"**{n} Laggards**")
@@ -171,26 +177,24 @@ with tab_terminal:
 
     st.divider()
 
-    # --- RESTORED DEEP DIVES ---
-    c_left, c_right = st.columns(2)
-    with c_left:
+    # --- DEEP DIVES (BITCOIN, ETH, SOL, DXY, GOLD RESTORED) ---
+    col_l, col_r = st.columns(2)
+    with col_l:
         with st.expander("🔍 Momentum & Trend Layers (SPX, QQQ, VXUS)", expanded=True):
             st.write(f"**S&P 500 (SPX):** {spx_now:,.2f} | **Nasdaq (QQQ):** {get_safe_data('QQQ'):,.2f}")
-            st.write(f"**Bitcoin:** ${get_safe_data('BTC-USD'):,.2f} | **200-MA:** ${get_sma('BTC-USD', 200):,.2f}")
+            st.write(f"**Bitcoin:** ${btc_now:,.2f} | **200-MA:** ${get_sma('BTC-USD', 200):,.2f}")
 
         with st.expander("₿ Crypto Intelligence Agent (BTC, ETH, SOL)", expanded=True):
             cryptos = {"Bitcoin (BTC)": "BTC-USD", "Ethereum (ETH)": "ETH-USD", "Solana (SOL)": "SOL-USD"}
-            cr_cols = st.columns(3)
+            c_cols = st.columns(3)
             for i, (name, ticker) in enumerate(cryptos.items()):
-                p = get_safe_data(ticker)
-                dr = calculate_rsi(ticker, "1d")
-                wr = calculate_rsi(ticker, "1wk")
-                with cr_cols[i]:
+                p, dr, wr = get_safe_data(ticker), calculate_rsi(ticker, "1d"), calculate_rsi(ticker, "1wk")
+                with c_cols[i]:
                     st.write(f"**{name}**")
                     st.write(f"Price: ${p:,.2f}")
                     st.write(f"Daily RSI: {dr:.1f} | Weekly: {wr:.1f}")
 
-    with c_right:
+    with col_r:
         with st.expander("🌊 Liquidity & Yields", expanded=True):
             st.write(f"**Dollar Index (DXY):** {dxy_now:.2f} | **10Y/3M Spread:** {tnx_now-short_rate:.2f}%")
             st.write(f"**Gold Price:** ${gold_now:,.2f} | **Gold/SPX Ratio:** {gold_now/spx_now:.4f}")
@@ -204,27 +208,32 @@ with tab_terminal:
     f_feed = feedparser.parse("https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114")
     for entry in f_feed.entries[:5]: st.markdown(f"- [{entry.title}]({entry.link})")
 
-# --- TAB 2: PORTFOLIO LAB ---
+# --- TAB 2: PORTFOLIO LAB (Full Weights + Rationale) ---
 with tab_lab:
     st.header("📈 Lazy Portfolio Performance Lab")
     all_t = list(set([t for p in PORTFOLIOS.values() for t in p["weights"].keys()]))
-    y_start = f"{datetime.now().year}-01-01"
+    ytd_start = f"{datetime.now().year}-01-01"
     
     @st.cache_data(ttl=3600)
-    def get_ytd_px(tickers):
+    def get_ytd_data(tickers):
         px = {}
         for t in tickers:
             try:
-                df = yf.download(t, start=y_start, progress=False)
+                df = yf.download(t, start=ytd_start, progress=False)
                 if not df.empty: px[t] = {"c": df['Close'].iloc[-1].item(), "s": df['Close'].iloc[0].item()}
             except: continue
         return px
 
-    prices = get_ytd_px(all_t)
-    if prices:
-        res = []
+    px_data = get_ytd_data(all_t)
+    if px_data:
+        results = []
         for name, data in PORTFOLIOS.items():
-            w_disp = [f"{t} ({int(w*100)}%)" for t, w in data["weights"].items()]
-            perf = sum(((prices[t]["c"]/prices[t]["s"])-1) * w for t, w in data["weights"].items() if t in prices)
-            res.append({"Portfolio": name, "YTD %": round(perf*100, 2), "Rationale": data["rationale"], "Weights": ", ".join(w_disp)})
-        st.dataframe(pd.DataFrame(res).sort_values("YTD %", ascending=False), use_container_width=True, hide_index=True)
+            w_display = [f"{t} ({int(w*100)}%)" for t, w in data["weights"].items()]
+            ret = sum(((px_data[t]["c"]/px_data[t]["s"])-1) * w for t, w in data["weights"].items() if t in px_data)
+            results.append({
+                "Portfolio": name, 
+                "YTD %": round(ret*100, 2), 
+                "Rationale": data["rationale"], 
+                "Tickers & Weights": ", ".join(w_display)
+            })
+        st.dataframe(pd.DataFrame(results).sort_values("YTD %", ascending=False), use_container_width=True, hide_index=True)

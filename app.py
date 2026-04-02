@@ -5,17 +5,10 @@ import feedparser
 import requests
 from datetime import datetime
 
-# --- 1. PAGE CONFIG & STYLES ---
+# --- 1. PAGE CONFIG ---
 st.set_page_config(page_title="Multi-Asset Terminal", layout="wide")
 
-st.markdown("""
-    <style>
-        [data-testid="stMetricValue"] { font-size: 1.8rem !important; }
-        .stDataFrame { height: 400px; }
-    </style>
-""", unsafe_allow_html=True)
-
-# --- 2. PORTFOLIO DEFINITIONS ---
+# --- 2. DATA DEFINITIONS ---
 PORTFOLIOS = {
     "All-Weather (Dalio)": {"VTI": 0.30, "TLT": 0.40, "IEF": 0.15, "GLD": 0.075, "DBC": 0.075},
     "60/40 Portfolio": {"VTI": 0.60, "BND": 0.40},
@@ -29,19 +22,23 @@ PORTFOLIOS = {
     "Global Asset Allocation": {"VTI": 0.18, "VEA": 0.135, "VWO": 0.045, "LQD": 0.18, "TLT": 0.18, "GLD": 0.10, "DBC": 0.10, "VNQ": 0.08}
 }
 
-# --- 3. HIGH-EFFICIENCY DATA ENGINES ---
+SECTORS = {
+    "XLC": "Comm Services", "XLY": "Consumer Disc", "XLP": "Consumer Staples",
+    "XLE": "Energy", "XLF": "Financials", "XLV": "Health Care",
+    "XLI": "Industrials", "XLB": "Materials", "XLRE": "Real Estate",
+    "XLK": "Technology", "XLU": "Utilities"
+}
+
+# --- 3. CORE FUNCTIONS ---
 
 @st.cache_data(ttl=600)
-def get_terminal_data(tickers):
-    """Vectorized fetch for core terminal metrics."""
+def get_historical_data(tickers, period="2y"):
     try:
-        data = yf.download(tickers, period="2y", progress=False)['Close']
-        return data
+        return yf.download(tickers, period=period, progress=False)['Close']
     except:
         return pd.DataFrame()
 
 def calculate_rsi_vector(series, window=14):
-    """Wilder's Smoothing RSI - Vectorized for speed."""
     delta = series.diff()
     gain = (delta.where(delta > 0, 0)).ewm(alpha=1/window, adjust=False).mean()
     loss = (-delta.where(delta < 0, 0)).ewm(alpha=1/window, adjust=False).mean()
@@ -56,104 +53,94 @@ def get_news_feed(url, limit=5):
     except:
         return []
 
-# --- 4. DATA PROCESSING ---
-core_symbols = ["^GSPC", "QQQ", "VXUS", "^VIX", "^TNX", "^IRX", "DX-Y.NYB", "BTC-USD", "GC=F", "XLRE"]
-raw_data = get_terminal_data(core_symbols)
-
-# Latest Prices
-prices = raw_data.iloc[-1]
-spx_now, btc_now, gold_now = prices["^GSPC"], prices["BTC-USD"], prices["GC=F"]
-vix_now, dxy_now, tnx_now, short_rate = prices["^VIX"], prices["DX-Y.NYB"], prices["^TNX"], prices["^IRX"]
-
-# Technicals (200MA & RSI)
-sma_200_spx = raw_data["^GSPC"].rolling(window=200).mean().iloc[-1]
-sma_200_btc = raw_data["BTC-USD"].rolling(window=200).mean().iloc[-1]
-sma_200_gold = raw_data["GC=F"].rolling(window=200).mean().iloc[-1]
-
-rsi_spx = calculate_rsi_vector(raw_data["^GSPC"]).iloc[-1]
-rsi_qqq = calculate_rsi_vector(raw_data["QQQ"]).iloc[-1]
-rsi_vxus = calculate_rsi_vector(raw_data["VXUS"]).iloc[-1]
-avg_rsi = (rsi_spx + rsi_qqq + rsi_vxus) / 3
-
-# --- 5. UI TABS ---
+# --- 4. TABS ---
 tab_terminal, tab_alpha, tab_lab = st.tabs(["🛡️ Terminal", "🕵️ Alpha", "📈 Portfolio Lab"])
 
-# --- TAB 1: TERMINAL ---
 with tab_terminal:
     st.title("🛡️ Multi-Asset Terminal")
-    st.subheader("Global Asset Intel | G.A.I. Multi-Asset Overlay")
+    
+    with st.status("Syncing Global Markets...", expanded=False):
+        # Fetch indices + Sectors together
+        all_core = ["^GSPC", "QQQ", "VXUS", "^VIX", "^TNX", "^IRX", "DX-Y.NYB", "BTC-USD", "GC=F"] + list(SECTORS.keys())
+        full_df = get_historical_data(all_core)
+        
+        prices = full_df.iloc[-1]
+        spx_now, sma_200_spx = prices["^GSPC"], full_df["^GSPC"].rolling(200).mean().iloc[-1]
+        
+        # Sector Analytics
+        sector_df = full_df[list(SECTORS.keys())]
+        s_rsis = {t: calculate_rsi_vector(sector_df[t]).iloc[-1] for t in SECTORS.keys()}
+        
+        # Performance Windows
+        s_daily = ((sector_df.iloc[-1] / sector_df.iloc[-2]) - 1) * 100
+        s_weekly = ((sector_df.iloc[-1] / sector_df.iloc[-6]) - 1) * 100
+        s_monthly = ((sector_df.iloc[-1] / sector_df.iloc[-21]) - 1) * 100
+        ytd_start = sector_df[sector_df.index >= f"{datetime.now().year}-01-01"].iloc[0]
+        s_ytd = ((sector_df.iloc[-1] / ytd_start) - 1) * 100
 
-    # 6 PILLARS OVERLAY
+    # 6 PILLARS
     cols = st.columns(6)
     mom_label = "BULLISH" if spx_now > sma_200_spx else "BEARISH"
     mom_ico = "🟢" if mom_label == "BULLISH" else "🔴"
-    mom_dist = ((spx_now/sma_200_spx)-1)*100
-    
-    cols[0].metric("Momentum", f"{mom_ico} {mom_label}", f"{mom_dist:+.1f}% vs 200D")
-    cols[1].metric("Inflation", "🟡 2.40%", "PCE Sticky at 3%")
+    cols[0].metric("Momentum", f"{mom_ico} {mom_label}", f"{((spx_now/sma_200_spx)-1)*100:+.1f}% vs 200D")
+    cols[1].metric("Inflation", "🟡 2.40%", "PCE Sticky")
     cols[2].metric("Growth", "🟡 1.40%", "Q4 Slowdown")
-    cols[3].metric("Positioning", "🟢 LITE", f"VIX {vix_now:.1f}")
+    cols[3].metric("Positioning", "🟢 LITE", f"VIX {prices['^VIX']:.1f}")
     cols[4].metric("Monetary", "🟡 6.75%", "Prime Rate")
     cols[5].metric("Fiscal", "🔴 DEFICIT", "Duration Mix ↑")
 
     st.divider()
 
-    # ASSET CLASS SCORECARD (Trend-Following Logic)
-    st.subheader("🎯 Asset Class Scorecard")
-    s_cols = st.columns(5)
+    # SECTOR PERFORMANCE & HEATMAP (Restored)
+    st.subheader("📊 Sector Performance & RSI Heatmap")
+    heat_cols = st.columns(11)
+    for i, (t, rsi) in enumerate(s_rsis.items()):
+        c = "🔴" if rsi > 70 else ("🔵" if rsi < 30 else "⚪")
+        heat_cols[i].metric(SECTORS[t], f"{rsi:.0f}", c)
     
-    def get_rating(bull_cond, bear_cond):
-        if bull_cond: return "🟢 BULLISH"
-        if bear_cond: return "🔴 BEARISH"
-        return "🟡 NEUTRAL"
+    st.write("---")
+    l_cols = st.columns(4)
+    timeframes = [("Daily", s_daily), ("Weekly", s_weekly), ("Monthly", s_monthly), ("YTD", s_ytd)]
+    
+    for i, (name, series) in enumerate(timeframes):
+        with l_cols[i]:
+            st.write(f"**{name} Leaders**")
+            top = series.sort_values(ascending=False).head(3)
+            for t, v in top.items(): st.write(f"🟢 {SECTORS[t]}: {v:+.1f}%")
+            st.write(f"**{name} Laggards**")
+            bot = series.sort_values(ascending=True).head(3)
+            for t, v in bot.items(): st.write(f"🔴 {SECTORS[t]}: {v:+.1f}%")
 
-    s_cols[0].metric("Stocks", get_rating(spx_now > sma_200_spx and rsi_spx < 70, spx_now < sma_200_spx or rsi_spx > 80))
-    s_cols[1].metric("Bonds", get_rating(tnx_now > short_rate, tnx_now < short_rate))
-    s_cols[2].metric("Gold", get_rating(gold_now > sma_200_gold, gold_now < sma_200_gold))
-    s_cols[3].metric("Crypto", get_rating(btc_now > sma_200_btc and dxy_now < 103, btc_now < sma_200_btc))
-    s_cols[4].metric("Real Estate", get_rating(calculate_rsi_vector(raw_data["XLRE"]).iloc[-1] < 35, calculate_rsi_vector(raw_data["XLRE"]).iloc[-1] > 65))
-
-    # HEATMAP & NEWS
     st.divider()
-    st.subheader("🌡️ Market Temperature")
-    temp_status = "EXTREME GREED" if avg_rsi > 70 else "EXTREME FEAR" if avg_rsi < 30 else "NEUTRAL"
-    st.markdown(f"### Current Regime: **{temp_status}** (Avg RSI: {avg_rsi:.1f})")
 
-    col_l, col_r = st.columns(2)
-    with col_l:
-        st.write("**🌍 Global Headlines (BBC)**")
+    # NEWS AGENTS
+    c_left, c_right = st.columns(2)
+    with c_left:
+        st.write("**🌍 Global Headlines**")
         for n in get_news_feed("https://feeds.bbci.co.uk/news/world/rss.xml"):
             st.markdown(f"- [{n['title']}]({n['link']})")
-    with col_r:
-        st.write("**💰 Finance Headlines (CNBC)**")
+    with c_right:
+        st.write("**💰 Finance Headlines**")
         for n in get_news_feed("https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114"):
             st.markdown(f"- [{n['title']}]({n['link']})")
 
-# --- TAB 2: ALPHA (Simplified for space) ---
-with tab_alpha:
-    st.header("🕵️ Unusual Congressional Alpha")
-    st.info("Agent monitoring live filings for small-cap clusters...")
-    # Placeholder for the API logic from previous code
-    st.warning("Connect FMP API Key in secrets to activate live tracking.")
-
-# --- TAB 3: PORTFOLIO LAB (High Efficiency) ---
+# --- TAB 3: PORTFOLIO LAB ---
 with tab_lab:
     st.header("📈 Lazy Portfolio Performance Lab")
     all_p_tickers = list(set([t for p in PORTFOLIOS.values() for t in p.keys()]))
     
     @st.cache_data(ttl=3600)
-    def get_ytd_data(tickers):
+    def get_ytd_returns(tickers):
         start = f"{datetime.now().year}-01-01"
         data = yf.download(tickers, start=start, progress=False)['Close']
         return (data.iloc[-1] / data.iloc[0]) - 1
 
-    ytd_returns = get_ytd_data(all_p_tickers)
-    
+    ytd_rets = get_ytd_returns(all_p_tickers)
     results = []
     for name, weights in PORTFOLIOS.items():
-        ret = sum(ytd_returns[t] * w for t, w in weights.items() if t in ytd_returns)
-        results.append({"Design": name, "YTD %": round(ret*100, 2), "Assets": ", ".join(weights.keys())})
+        ret = sum(ytd_rets[t] * w for t, w in weights.items() if t in ytd_rets)
+        results.append({"Portfolio": name, "YTD %": round(ret*100, 2), "Assets": ", ".join(weights.keys())})
     
     st.dataframe(pd.DataFrame(results).sort_values("YTD %", ascending=False), use_container_width=True, hide_index=True)
 
-st.caption(f"Last Sync: {datetime.now().strftime('%Y-%m-%d %H:%M')} | Sources: YFinance, BBC, CNBC")
+st.caption(f"Terminal Updated: {datetime.now().strftime('%H:%M:%S')}")

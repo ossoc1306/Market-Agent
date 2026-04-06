@@ -343,3 +343,72 @@ with tab_rebalance:
         })
     
     st.table(pd.DataFrame(rebalance_data))
+
+# --- TAB 4: STRATEGY ARCHITECT (Backtesting & Stress Tests) ---
+with tab_rebalance: # Use your existing tab list logic
+    # (Optional: Add a new tab to your st.tabs list if you haven't already)
+    st.header("🔬 Custom Strategy & Stress Test")
+    
+    REGIMES = {
+        "2008 Housing Crisis": ("2007-10-01", "2009-03-09"),
+        "2020 COVID Crash": ("2020-02-19", "2020-03-23"),
+        "2022 Rate Hike Shock": ("2022-01-01", "2022-12-31"),
+        "Bull Market Run (Recent)": ("2023-01-01", datetime.now().strftime("%Y-%m-%d"))
+    }
+
+    col_build, col_stress = st.columns([2, 1])
+
+    with col_build:
+        st.subheader("🛠️ Build Your Tickers")
+        custom_tickers_raw = st.text_input("Enter Tickers (comma separated)", value="VTI, VXUS, BND, GLD")
+        custom_tickers = [t.strip().upper() for t in custom_tickers_raw.split(",")]
+        
+        st.write("Assign Weights (Must sum to 100%)")
+        c_weight_cols = st.columns(len(custom_tickers))
+        custom_weights = {}
+        for i, ticker in enumerate(custom_tickers):
+            custom_weights[ticker] = c_weight_cols[i].number_input(f"{ticker} %", min_value=0, max_value=100, value=100//len(custom_tickers))
+        
+        total_w = sum(custom_weights.values())
+        compare_spx = st.checkbox("Compare against S&P 500 (SPY)", value=True)
+
+    with col_stress:
+        st.subheader("🌪️ Select Environment")
+        selected_regime = st.selectbox("Historical Regime", list(REGIMES.keys()))
+        start_date, end_date = REGIMES[selected_regime]
+
+    if st.button("🚀 Run Stress Test") and total_w == 100:
+        with st.spinner("Analyzing historical performance..."):
+            try:
+                # Fetch Portfolio and S&P 500 data
+                all_fetch = custom_tickers + (["SPY"] if compare_spx else [])
+                data = yf.download(all_fetch, start=start_date, end=end_date, progress=False)['Close']
+                
+                # Calculate Portfolio Returns
+                returns = data[custom_tickers].pct_change().dropna()
+                weights_arr = [custom_weights[t]/100 for t in custom_tickers]
+                port_returns = (returns * weights_arr).sum(axis=1)
+                cumulative_growth = (1 + port_returns).cumprod() * 100
+                
+                # Metrics Prep
+                port_perf = (cumulative_growth.iloc[-1] - 100)
+                max_dd = ((cumulative_growth / cumulative_growth.cummax()) - 1).min() * 100
+                
+                # Visuals
+                m1, m2, m3 = st.columns(3)
+                m1.metric("Strategy Return", f"{port_perf:+.2f}%")
+                m2.metric("Max Drawdown", f"{max_dd:.2f}%", delta_color="inverse")
+                
+                plot_df = pd.DataFrame({"Your Strategy": cumulative_growth})
+                
+                if compare_spx:
+                    spy_returns = data["SPY"].pct_change().dropna()
+                    spy_growth = (1 + spy_returns).cumprod() * 100
+                    spy_perf = (spy_growth.iloc[-1] - 100)
+                    plot_df["S&P 500 (SPY)"] = spy_growth
+                    m3.metric("Market Alpha", f"{port_perf - spy_perf:+.2f}%", help="Performance relative to S&P 500")
+
+                st.line_chart(plot_df)
+                
+            except Exception as e:
+                st.error(f"Error: {e}. Check if tickers existed during this period.")

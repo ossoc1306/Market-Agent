@@ -343,30 +343,19 @@ with tab_rebalance:
     
     st.table(pd.DataFrame(rebalance_data))
 
-# --- TAB 4: STRATEGY ARCHITECT (Backtesting & Stress Tests) ---
+# --- TAB 4: STRATEGY ARCHITECT (Custom Dates & Stress Tests) ---
 with tab_architect:
     st.header("🔬 Custom Strategy & Stress Test")
     
+    # Keep regimes for "Quick Select" functionality
     REGIMES = {
-        "2008 Housing Crisis": {
-            "dates": ("2007-10-01", "2009-03-09"),
-            "summary": "The Great Recession was triggered by a collapse in the U.S. housing market. The S&P 500 fell ~50%, and investors fled to the safety of U.S. Treasuries and Gold."
-        },
-        "2020 COVID Crash": {
-            "dates": ("2020-02-19", "2020-03-23"),
-            "summary": "The swiftest bear market in history. Global lockdowns caused a massive liquidity shock, halted only by massive Federal Reserve intervention."
-        },
-        "2022 Rate Hike Shock": {
-            "dates": ("2022-01-01", "2022-12-31"),
-            "summary": "A rare regime where both stocks and bonds crashed as the Fed fought 40-year high inflation. Commodities and the USD were the only safe havens."
-        },
-        "Bull Market Run (Recent)": {
-            "dates": ("2023-01-01", datetime.now().strftime("%Y-%m-%d")),
-            "summary": "Defined by the 'AI Revolution' and a resilient U.S. economy. Large-cap tech has driven the majority of gains."
-        }
+        "2008 Housing Crisis": ("2007-10-01", "2009-03-09"),
+        "2020 COVID Crash": ("2020-02-19", "2020-03-23"),
+        "2022 Rate Hike Shock": ("2022-01-01", "2022-12-31"),
+        "Bull Market Run (Recent)": ("2023-01-01", datetime.now().strftime("%Y-%m-%d"))
     }
 
-    col_build, col_stress = st.columns([2, 1])
+    col_build, col_dates = st.columns([2, 1])
 
     with col_build:
         st.subheader("🛠️ Build Your Tickers")
@@ -382,16 +371,30 @@ with tab_architect:
         total_w = sum(custom_weights.values())
         compare_spx = st.checkbox("Compare against S&P 500 (SPY)", value=True)
 
-    with col_stress:
-        st.subheader("🌪️ Select Environment")
-        selected_regime = st.selectbox("Historical Regime", list(REGIMES.keys()))
-        start_date, end_date = REGIMES[selected_regime]["dates"]
+    with col_dates:
+        st.subheader("📅 Select Timeframe")
         
-    if st.button("🚀 Run Stress Test") and total_w == 100:
-        # Market History Summary Box
-        st.info(f"**Market Context: {selected_regime}**\n\n{REGIMES[selected_regime]['summary']}")
+        # New Feature: Custom Date Range Selector
+        date_range = st.date_input(
+            "Select Start and End Dates",
+            value=[datetime(2020, 1, 1), datetime.now()],
+            max_value=datetime.now()
+        )
         
-        with st.spinner("Analyzing historical performance..."):
+        st.write("---")
+        st.caption("Quick Select Historical Regimes:")
+        quick_regime = st.selectbox("Apply Preset Range:", ["Custom"] + list(REGIMES.keys()))
+        
+        # If a preset is chosen, it overrides the date_range logic in the backend
+        if quick_regime != "Custom":
+            start_date, end_date = REGIMES[quick_regime]
+        elif len(date_range) == 2:
+            start_date, end_date = date_range
+        else:
+            start_date = end_date = None
+
+    if st.button("🚀 Run Stress Test") and total_w == 100 and start_date:
+        with st.spinner("Analyzing performance over selected timeframe..."):
             try:
                 all_fetch = custom_tickers + (["SPY"] if compare_spx else [])
                 data = yf.download(all_fetch, start=start_date, end=end_date, progress=False)['Close']
@@ -402,43 +405,29 @@ with tab_architect:
                 port_returns = (returns * weights_arr).sum(axis=1)
                 cumulative_growth = (1 + port_returns).cumprod() * 100
                 
-                # Volatility (Annualized Std Dev)
+                # Volatility & Metrics
                 port_vol = port_returns.std() * (252**0.5) * 100
-
-                # Asset-Level Performance for Contribution Chart
-                asset_perf = {t: ((data[t].iloc[-1] / data[t].iloc[0]) - 1) * 100 for t in custom_tickers}
+                port_perf = (cumulative_growth.iloc[-1] - 100)
+                max_dd = ((cumulative_growth / cumulative_growth.cummax()) - 1).min() * 100
                 
                 # Metrics Row
                 m1, m2, m3, m4 = st.columns(4)
-                m1.metric("Strategy Return", f"{cumulative_growth.iloc[-1]-100:+.2f}%")
-                m2.metric("Max Drawdown", f"{(((cumulative_growth / cumulative_growth.cummax()) - 1).min() * 100):.2f}%", delta_color="inverse")
-                
-                # REFINED VOLATILITY SCORE
-                m3.metric(
-                    "Volatility Score", 
-                    f"{port_vol:.1f}%", 
-                    help="Annualized Standard Deviation. For context, the average S&P 500 Volatility is 15-18%."
-                )
+                m1.metric("Strategy Return", f"{port_perf:+.2f}%")
+                m2.metric("Max Drawdown", f"{max_dd:.2f}%", delta_color="inverse")
+                m3.metric("Volatility Score", f"{port_vol:.1f}%", help="Annualized Standard Deviation. Avg S&P Vol is 15-18%.")
                 
                 plot_df = pd.DataFrame({"Your Strategy": cumulative_growth})
-                
-                # REFINED COMPARISON LABEL
                 if compare_spx:
                     spy_growth = (1 + data["SPY"].pct_change().dropna()).cumprod() * 100
                     plot_df["S&P 500 (SPY)"] = spy_growth
-                    
-                    # Difference between Strategy and S&P
-                    strategy_vs_spy = (cumulative_growth.iloc[-1] - spy_growth.iloc[-1])
-                    m4.metric("Strategy vs the S&P", f"{strategy_vs_spy:+.2f}%")
+                    m4.metric("Strategy vs the S&P", f"{(port_perf - (spy_growth.iloc[-1]-100)):+.2f}%")
 
                 st.line_chart(plot_df)
-
-                # --- ASSET CONTRIBUTION SECTION ---
-                st.subheader("📊 Individual Asset Performance")
-                st.write("How each ticker performed during this specific regime:")
                 
-                contrib_df = pd.DataFrame.from_dict(asset_perf, orient='index', columns=['Return %'])
-                st.bar_chart(contrib_df)
+                # Asset Performance Bar Chart
+                st.subheader("📊 Individual Asset Performance")
+                asset_perf = {t: ((data[t].iloc[-1] / data[t].iloc[0]) - 1) * 100 for t in custom_tickers}
+                st.bar_chart(pd.DataFrame.from_dict(asset_perf, orient='index', columns=['Return %']))
                 
             except Exception as e:
-                st.error(f"Error: {e}. Check if tickers existed during this period.")
+                st.error(f"Error: {e}. Ensure all tickers were active during this timeframe.")

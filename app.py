@@ -343,7 +343,7 @@ with tab_rebalance:
     
     st.table(pd.DataFrame(rebalance_data))
 
-# --- TAB 4: STRATEGY ARCHITECT (With Fail-Safes & Error Handling) ---
+# --- TAB 4: STRATEGY ARCHITECT (With Sharpe Ratio & Novice Guide) ---
 with tab_architect:
     st.header("🔬 Custom Strategy & Stress Test")
     
@@ -419,29 +419,33 @@ with tab_architect:
                     
                     # 2. Download Data
                     raw_data = yf.download(tickers_to_fetch, start=start_date, end=end_date, progress=False)
-                    
-                    # 3. Handle Multi-Index (Close vs Adj Close)
                     data = raw_data['Close'] if 'Close' in raw_data.columns else raw_data
 
                     if data.empty:
-                        st.error("No historical data found for these tickers in this timeframe. Try a more recent date.")
+                        st.error("No historical data found for these tickers in this timeframe.")
                     else:
-                        # 4. Portfolio Calculations
+                        # 3. Portfolio Calculations
                         returns = data[custom_tickers].pct_change().dropna()
                         weights_arr = [custom_weights[t]/100 for t in custom_tickers]
                         port_returns = (returns * weights_arr).sum(axis=1)
                         cumulative_growth = (1 + port_returns).cumprod() * 100
                         
-                        # Metrics
+                        # Metrics Calculation
                         port_vol = port_returns.std() * (252**0.5) * 100
                         port_perf = (cumulative_growth.iloc[-1] - 100)
                         max_dd = ((cumulative_growth / cumulative_growth.cummax()) - 1).min() * 100
                         
-                        # 5. UI Output
-                        m1, m2, m3, m4 = st.columns(4)
+                        # NEW: Sharpe Ratio Logic (2% risk-free rate assumption)
+                        rf_daily = 0.02 / 252
+                        excess_returns = port_returns - rf_daily
+                        sharpe_ratio = (excess_returns.mean() / port_returns.std()) * (252**0.5) if port_returns.std() != 0 else 0
+                        
+                        # 4. UI Output - Expanded to 5 columns
+                        m1, m2, m3, m4, m5 = st.columns(5)
                         m1.metric("Strategy Return", f"{port_perf:+.2f}%")
                         m2.metric("Max Drawdown", f"{max_dd:.2f}%", delta_color="inverse")
                         m3.metric("Volatility Score", f"{port_vol:.1f}%", help="Avg S&P Vol is 15-18%.")
+                        m4.metric("Sharpe Ratio", f"{sharpe_ratio:.2f}", help="Risk-adjusted return. Higher is better.")
 
                         plot_df = pd.DataFrame({"Your Strategy": cumulative_growth}, index=cumulative_growth.index)
 
@@ -450,7 +454,20 @@ with tab_architect:
                             bench_growth = (1 + data[bench_ticker].pct_change().dropna()).cumprod() * 100
                             bench_perf = bench_growth.iloc[-1] - 100
                             plot_df[f"Benchmark ({bench_ticker})"] = bench_growth
-                            m4.metric(f"vs {benchmark_choice.split(' ')[0]}", f"{(port_perf - bench_perf):+.2f}%")
+                            m5.metric(f"vs {benchmark_choice.split(' ')[0]}", f"{(port_perf - bench_perf):+.2f}%")
+
+                        # 5. Sharpe Ratio Educational Expander
+                        with st.expander("🎓 What is the Sharpe Ratio? (Novice Guide)"):
+                            st.write("""
+                            The **Sharpe Ratio** tells you if your returns are 'worth it' or if you are just taking too much unnecessary risk. 
+                            
+                            * **The Concept:** If two investors both made 10%, but Investor A had a smooth ride while Investor B had massive price swings, Investor A has a higher Sharpe Ratio.
+                            * **How to read the score:**
+                                * **Under 1.0:** Acceptable, but high risk for the return.
+                                * **1.0 to 1.9:** Good. You are being well-compensated for the risk.
+                                * **2.0 to 2.9:** Very Good. Professional-level risk management.
+                                * **3.0+:** Excellent.
+                            """)
 
                         st.line_chart(plot_df)
                         

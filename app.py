@@ -265,10 +265,10 @@ with tab_lab:
         
         st.dataframe(pd.DataFrame(res).sort_values(by="YTD %", ascending=False), use_container_width=True, hide_index=True)
 
-# --- TAB 3: REBALANCE & INCOME SECTION ---
+# --- TAB 3: REBALANCE & INCOME SECTION (Updated with Editable Total) ---
 with tab_rebalance:
     st.header("⚖️ Rebalance & Income Projection")
-    st.write("Determine how much to rebalance and see your estimated annual cash flow.")
+    st.write("Define your target portfolio size to see required construction and projected cash flow.")
     
     col_input, col_stats = st.columns([2, 1])
     
@@ -276,26 +276,31 @@ with tab_rebalance:
         target_strategy = st.selectbox("Select Strategy to Analyze", list(PORTFOLIOS.keys()))
         target_weights = PORTFOLIOS[target_strategy]["weights"]
         
-        st.subheader("Current Holdings")
+        st.subheader("Portfolio Configuration")
+        # Editable Total Portfolio Value
+        total_portfolio_value = st.number_input("Target Total Portfolio Value ($)", min_value=0.0, value=40000.0, step=1000.0, help="Input your total account value to see the target breakdown.")
+        
+        st.write("---")
+        st.info("💡 **Actual Holdings:** Input your current balances below. If left at $0, it shows a clean construction for your Target Value.")
+        
         current_vals = {}
         input_cols = st.columns(3)
         for i, ticker in enumerate(target_weights.keys()):
-            current_vals[ticker] = input_cols[i % 3].number_input(f"{ticker} Balance ($)", min_value=0.0, value=10000.0, step=1000.0)
+            current_vals[ticker] = input_cols[i % 3].number_input(f"Actual {ticker} ($)", min_value=0.0, value=0.0, step=1000.0)
     
-    total_portfolio_value = sum(current_vals.values())
     portfolio_yield_pct = PORTFOLIOS[target_strategy]["est_yield"]
     annual_income = total_portfolio_value * (portfolio_yield_pct / 100)
 
     with col_stats:
         st.subheader("💰 Income Projection")
-        st.metric("Total Portfolio Value", f"${total_portfolio_value:,.2f}")
+        st.metric("Defined Portfolio Value", f"${total_portfolio_value:,.2f}")
         st.metric("Est. Annual Income", f"${annual_income:,.2f}", f"{portfolio_yield_pct}% Yield")
         st.write(f"**Monthly Average:** ${annual_income/12:,.2f}")
         st.caption("Note: Yields are based on trailing twelve-month (TTM) averages.")
 
     st.divider()
     
-    st.subheader("🛠️ Rebalancing Action Plan")
+    st.subheader("🛠️ Rebalancing & Construction Plan")
     rebalance_data = []
     for ticker, weight in target_weights.items():
         target_val = total_portfolio_value * weight
@@ -306,7 +311,7 @@ with tab_rebalance:
             "Target Allocation": f"{weight*100:.1f}%",
             "Current Allocation": f"{(actual_val/total_portfolio_value)*100:.1f}%" if total_portfolio_value > 0 else "0%",
             "Current Value": f"${actual_val:,.2f}",
-            "Target Value": f"${target_val:,.2f}",
+            "Target Value (Ideal)": f"${target_val:,.2f}",
             "Required Action": f"🟢 BUY ${diff:,.2f}" if diff > 0 else f"🔴 SELL ${abs(diff):,.2f}"
         })
     

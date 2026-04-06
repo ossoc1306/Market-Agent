@@ -343,27 +343,26 @@ with tab_rebalance:
     
     st.table(pd.DataFrame(rebalance_data))
 
-# --- TAB 4: STRATEGY ARCHITECT (Custom Dates, Multi-Benchmark & Stress Tests) ---
+# --- TAB 4: STRATEGY ARCHITECT (With Fail-Safes & Error Handling) ---
 with tab_architect:
     st.header("🔬 Custom Strategy & Stress Test")
     
-    # REGIME DEFINITIONS & SUMMARIES
     REGIMES = {
         "2008 Housing Crisis": {
             "dates": ("2007-10-01", "2009-03-09"),
-            "summary": "The Great Recession triggered by the housing collapse. S&P 500 fell ~50%; flight to Treasuries and Gold."
+            "summary": "The Great Recession triggered by the housing collapse. S&P 500 fell ~50%."
         },
         "2020 COVID Crash": {
             "dates": ("2020-02-19", "2020-03-23"),
-            "summary": "Swift bear market due to global lockdowns. Market bottomed after massive Fed intervention."
+            "summary": "Swift bear market due to global lockdowns. Market bottomed after Fed intervention."
         },
         "2022 Rate Hike Shock": {
             "dates": ("2022-01-01", "2022-12-31"),
-            "summary": "Stocks and bonds crashed simultaneously as the Fed fought 40-year high inflation."
+            "summary": "Stocks and bonds crashed as the Fed fought 40-year high inflation."
         },
         "Bull Market Run (Recent)": {
             "dates": ("2023-01-01", datetime.now().strftime("%Y-%m-%d")),
-            "summary": "Defined by the AI Revolution and resilient economy. Tech led most of the gains."
+            "summary": "Defined by the AI Revolution. Tech led most of the gains."
         }
     }
 
@@ -371,18 +370,17 @@ with tab_architect:
 
     with col_build:
         st.subheader("🛠️ Build Your Tickers")
-        custom_tickers_raw = st.text_input("Enter Tickers (comma separated)", value="VTI, VXUS, BND, GLD")
-        custom_tickers = [t.strip().upper() for t in custom_tickers_raw.split(",")]
+        custom_tickers_raw = st.text_input("Enter Tickers (comma separated)", value="XLE, QQQ, GLD")
+        custom_tickers = [t.strip().upper() for t in custom_tickers_raw.split(",") if t.strip()]
         
         st.write("Assign Weights (Must sum to 100%)")
-        c_weight_cols = st.columns(len(custom_tickers))
+        c_weight_cols = st.columns(len(custom_tickers) if custom_tickers else 1)
         custom_weights = {}
         for i, ticker in enumerate(custom_tickers):
             custom_weights[ticker] = c_weight_cols[i].number_input(f"{ticker} %", min_value=0, max_value=100, value=100//len(custom_tickers))
         
         total_w = sum(custom_weights.values())
         
-        # NEW: Multi-Benchmark Selector
         benchmark_choice = st.selectbox(
             "Compare against Benchmark:", 
             ["S&P 500 (SPY)", "Nasdaq 100 (QQQ)", "Bitcoin (BTC-USD)", "None"]
@@ -391,7 +389,7 @@ with tab_architect:
 
     with col_dates:
         st.subheader("📅 Select Timeframe")
-        date_range = st.date_input("Select Start and End Dates", value=[datetime(2020, 1, 1), datetime.now()], max_value=datetime.now())
+        date_range = st.date_input("Select Start and End Dates", value=[datetime(2020, 1, 1), datetime.now()])
         
         st.write("---")
         st.caption("Quick Select Historical Regimes:")
@@ -400,56 +398,66 @@ with tab_architect:
         if quick_regime != "Custom":
             start_date, end_date = REGIMES[quick_regime]["dates"]
             st.info(f"**Market Context:** {REGIMES[quick_regime]['summary']}")
-        elif len(date_range) == 2:
+        elif isinstance(date_range, list) and len(date_range) == 2:
             start_date, end_date = date_range
         else:
             start_date = end_date = None
 
-    if st.button("🚀 Run Stress Test") and total_w == 100 and start_date:
-        with st.spinner(f"Analyzing strategy performance..."):
-            try:
-                # Fetching strategy tickers + optional benchmark
-                tickers_to_fetch = custom_tickers.copy()
-                if benchmark_choice != "None":
-                    tickers_to_fetch.append(benchmark_map[benchmark_choice])
-                
-                data = yf.download(tickers_to_fetch, start=start_date, end=end_date, progress=False)['Close']
-                
-                # Portfolio Calculations
-                returns = data[custom_tickers].pct_change().dropna()
-                weights_arr = [custom_weights[t]/100 for t in custom_tickers]
-                port_returns = (returns * weights_arr).sum(axis=1)
-                cumulative_growth = (1 + port_returns).cumprod() * 100
-                
-                # Metrics
-                port_vol = port_returns.std() * (252**0.5) * 100
-                port_perf = (cumulative_growth.iloc[-1] - 100)
-                max_dd = ((cumulative_growth / cumulative_growth.cummax()) - 1).min() * 100
-                
-                # Plot setup
-                plot_df = pd.DataFrame({"Your Strategy": cumulative_growth})
-                
-                # Comparison Metric Column
-                m1, m2, m3, m4 = st.columns(4)
-                m1.metric("Strategy Return", f"{port_perf:+.2f}%")
-                m2.metric("Max Drawdown", f"{max_dd:.2f}%", delta_color="inverse")
-                m3.metric("Volatility Score", f"{port_vol:.1f}%", help="Annualized Std Dev. Context: S&P 500 Avg is 15-18%.")
-
-                if benchmark_choice != "None":
-                    bench_ticker = benchmark_map[benchmark_choice]
-                    bench_growth = (1 + data[bench_ticker].pct_change().dropna()).cumprod() * 100
-                    bench_perf = bench_growth.iloc[-1] - 100
-                    plot_df[f"Benchmark ({bench_ticker})"] = bench_growth
+    # THE TRIGGER BUTTON
+    if st.button("🚀 Run Stress Test"):
+        if total_w != 100:
+            st.error(f"⚠️ Total weight must be exactly 100%. Your current total is **{total_w}%**.")
+        elif not custom_tickers:
+            st.error("⚠️ Please enter at least one ticker symbol.")
+        elif not start_date:
+            st.warning("⚠️ Please select a full date range (Start and End).")
+        else:
+            with st.spinner(f"Fetching data and running simulations..."):
+                try:
+                    # 1. Prepare Tickers
+                    tickers_to_fetch = list(set(custom_tickers + ([benchmark_map[benchmark_choice]] if benchmark_choice != "None" else [])))
                     
-                    # Renamed dynamic metric
-                    m4.metric(f"Strategy vs {benchmark_choice.split(' ')[0]}", f"{(port_perf - bench_perf):+.2f}%")
+                    # 2. Download Data
+                    raw_data = yf.download(tickers_to_fetch, start=start_date, end=end_date, progress=False)
+                    
+                    # 3. Handle Multi-Index (Close vs Adj Close)
+                    data = raw_data['Close'] if 'Close' in raw_data.columns else raw_data
 
-                st.line_chart(plot_df)
-                
-                # Asset Performance Bar Chart
-                st.subheader("📊 Individual Asset Performance")
-                asset_perf = {t: ((data[t].iloc[-1] / data[t].iloc[0]) - 1) * 100 for t in custom_tickers}
-                st.bar_chart(pd.DataFrame.from_dict(asset_perf, orient='index', columns=['Return %']))
-                
-            except Exception as e:
-                st.error(f"Error: {e}. Ensure all tickers were active during this timeframe.")
+                    if data.empty:
+                        st.error("No historical data found for these tickers in this timeframe. Try a more recent date.")
+                    else:
+                        # 4. Portfolio Calculations
+                        returns = data[custom_tickers].pct_change().dropna()
+                        weights_arr = [custom_weights[t]/100 for t in custom_tickers]
+                        port_returns = (returns * weights_arr).sum(axis=1)
+                        cumulative_growth = (1 + port_returns).cumprod() * 100
+                        
+                        # Metrics
+                        port_vol = port_returns.std() * (252**0.5) * 100
+                        port_perf = (cumulative_growth.iloc[-1] - 100)
+                        max_dd = ((cumulative_growth / cumulative_growth.cummax()) - 1).min() * 100
+                        
+                        # 5. UI Output
+                        m1, m2, m3, m4 = st.columns(4)
+                        m1.metric("Strategy Return", f"{port_perf:+.2f}%")
+                        m2.metric("Max Drawdown", f"{max_dd:.2f}%", delta_color="inverse")
+                        m3.metric("Volatility Score", f"{port_vol:.1f}%", help="Avg S&P Vol is 15-18%.")
+
+                        plot_df = pd.DataFrame({"Your Strategy": cumulative_growth}, index=cumulative_growth.index)
+
+                        if benchmark_choice != "None":
+                            bench_ticker = benchmark_map[benchmark_choice]
+                            bench_growth = (1 + data[bench_ticker].pct_change().dropna()).cumprod() * 100
+                            bench_perf = bench_growth.iloc[-1] - 100
+                            plot_df[f"Benchmark ({bench_ticker})"] = bench_growth
+                            m4.metric(f"vs {benchmark_choice.split(' ')[0]}", f"{(port_perf - bench_perf):+.2f}%")
+
+                        st.line_chart(plot_df)
+                        
+                        # Asset Contribution
+                        st.subheader("📊 Individual Asset Performance")
+                        asset_perf = {t: ((data[t].iloc[-1] / data[t].iloc[0]) - 1) * 100 for t in custom_tickers}
+                        st.bar_chart(pd.DataFrame.from_dict(asset_perf, orient='index', columns=['Return %']))
+                        
+                except Exception as e:
+                    st.error(f"Calculation Error: {str(e)}")

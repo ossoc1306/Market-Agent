@@ -348,10 +348,22 @@ with tab_architect:
     st.header("🔬 Custom Strategy & Stress Test")
     
     REGIMES = {
-        "2008 Housing Crisis": ("2007-10-01", "2009-03-09"),
-        "2020 COVID Crash": ("2020-02-19", "2020-03-23"),
-        "2022 Rate Hike Shock": ("2022-01-01", "2022-12-31"),
-        "Bull Market Run (Recent)": ("2023-01-01", datetime.now().strftime("%Y-%m-%d"))
+        "2008 Housing Crisis": {
+            "dates": ("2007-10-01", "2009-03-09"),
+            "summary": "The Great Recession was triggered by a collapse in the U.S. housing market. The S&P 500 fell ~50%, and investors fled to the safety of U.S. Treasuries and Gold."
+        },
+        "2020 COVID Crash": {
+            "dates": ("2020-02-19", "2020-03-23"),
+            "summary": "The swiftest bear market in history. Global lockdowns caused a massive liquidity shock, halted only by massive Federal Reserve intervention."
+        },
+        "2022 Rate Hike Shock": {
+            "dates": ("2022-01-01", "2022-12-31"),
+            "summary": "A rare regime where both stocks and bonds crashed as the Fed fought 40-year high inflation. Commodities and the USD were the only safe havens."
+        },
+        "Bull Market Run (Recent)": {
+            "dates": ("2023-01-01", datetime.now().strftime("%Y-%m-%d")),
+            "summary": "Defined by the 'AI Revolution' and a resilient U.S. economy. Large-cap tech has driven the majority of gains."
+        }
     }
 
     col_build, col_stress = st.columns([2, 1])
@@ -373,40 +385,49 @@ with tab_architect:
     with col_stress:
         st.subheader("🌪️ Select Environment")
         selected_regime = st.selectbox("Historical Regime", list(REGIMES.keys()))
-        start_date, end_date = REGIMES[selected_regime]
-
+        start_date, end_date = REGIMES[selected_regime]["dates"]
+        
     if st.button("🚀 Run Stress Test") and total_w == 100:
+        # Market History Summary Box
+        st.info(f"**Market Context: {selected_regime}**\n\n{REGIMES[selected_regime]['summary']}")
+        
         with st.spinner("Analyzing historical performance..."):
             try:
-                # Fetch Portfolio and S&P 500 data
                 all_fetch = custom_tickers + (["SPY"] if compare_spx else [])
                 data = yf.download(all_fetch, start=start_date, end=end_date, progress=False)['Close']
                 
-                # Calculate Portfolio Returns
+                # Calculations
                 returns = data[custom_tickers].pct_change().dropna()
                 weights_arr = [custom_weights[t]/100 for t in custom_tickers]
                 port_returns = (returns * weights_arr).sum(axis=1)
                 cumulative_growth = (1 + port_returns).cumprod() * 100
                 
-                # Metrics Prep
-                port_perf = (cumulative_growth.iloc[-1] - 100)
-                max_dd = ((cumulative_growth / cumulative_growth.cummax()) - 1).min() * 100
+                # Volatility (Annualized Std Dev)
+                port_vol = port_returns.std() * (252**0.5) * 100
+
+                # Asset-Level Performance for Contribution Chart
+                asset_perf = {t: ((data[t].iloc[-1] / data[t].iloc[0]) - 1) * 100 for t in custom_tickers}
                 
-                # Visuals
-                m1, m2, m3 = st.columns(3)
-                m1.metric("Strategy Return", f"{port_perf:+.2f}%")
-                m2.metric("Max Drawdown", f"{max_dd:.2f}%", delta_color="inverse")
+                # Metrics Row
+                m1, m2, m3, m4 = st.columns(4)
+                m1.metric("Strategy Return", f"{cumulative_growth.iloc[-1]-100:+.2f}%")
+                m2.metric("Max Drawdown", f"{(((cumulative_growth / cumulative_growth.cummax()) - 1).min() * 100):.2f}%", delta_color="inverse")
+                m3.metric("Volatility Score", f"{port_vol:.1f}%", help="Annualized Standard Deviation.")
                 
                 plot_df = pd.DataFrame({"Your Strategy": cumulative_growth})
-                
                 if compare_spx:
-                    spy_returns = data["SPY"].pct_change().dropna()
-                    spy_growth = (1 + spy_returns).cumprod() * 100
-                    spy_perf = (spy_growth.iloc[-1] - 100)
+                    spy_growth = (1 + data["SPY"].pct_change().dropna()).cumprod() * 100
                     plot_df["S&P 500 (SPY)"] = spy_growth
-                    m3.metric("Market Alpha", f"{port_perf - spy_perf:+.2f}%", help="Performance relative to S&P 500")
+                    m4.metric("Market Alpha", f"{(cumulative_growth.iloc[-1] - spy_growth.iloc[-1]):+.2f}%")
 
                 st.line_chart(plot_df)
+
+                # --- NEW: ASSET CONTRIBUTION SECTION ---
+                st.subheader("📊 Individual Asset Performance")
+                st.write("How each ticker performed during this specific regime:")
+                
+                contrib_df = pd.DataFrame.from_dict(asset_perf, orient='index', columns=['Return %'])
+                st.bar_chart(contrib_df)
                 
             except Exception as e:
                 st.error(f"Error: {e}. Check if tickers existed during this period.")

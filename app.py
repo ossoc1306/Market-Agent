@@ -343,7 +343,7 @@ with tab_rebalance:
     
     st.table(pd.DataFrame(rebalance_data))
 
-# --- TAB 4: STRATEGY ARCHITECT (With Sharpe Ratio & Novice Guide) ---
+# --- TAB 4: STRATEGY ARCHITECT (Final Version with Correlation Matrix) ---
 with tab_architect:
     st.header("🔬 Custom Strategy & Stress Test")
     
@@ -370,7 +370,7 @@ with tab_architect:
 
     with col_build:
         st.subheader("🛠️ Build Your Tickers")
-        custom_tickers_raw = st.text_input("Enter Tickers (comma separated)", value="XLE, QQQ, GLD")
+        custom_tickers_raw = st.text_input("Enter Tickers (comma separated)", value="XLE, QQQ, GLD, BND")
         custom_tickers = [t.strip().upper() for t in custom_tickers_raw.split(",") if t.strip()]
         
         st.write("Assign Weights (Must sum to 100%)")
@@ -403,78 +403,78 @@ with tab_architect:
         else:
             start_date = end_date = None
 
-    # THE TRIGGER BUTTON
     if st.button("🚀 Run Stress Test"):
         if total_w != 100:
             st.error(f"⚠️ Total weight must be exactly 100%. Your current total is **{total_w}%**.")
         elif not custom_tickers:
             st.error("⚠️ Please enter at least one ticker symbol.")
         elif not start_date:
-            st.warning("⚠️ Please select a full date range (Start and End).")
+            st.warning("⚠️ Please select a full date range.")
         else:
-            with st.spinner(f"Fetching data and running simulations..."):
+            with st.spinner(f"Analyzing strategy performance..."):
                 try:
-                    # 1. Prepare Tickers
                     tickers_to_fetch = list(set(custom_tickers + ([benchmark_map[benchmark_choice]] if benchmark_choice != "None" else [])))
-                    
-                    # 2. Download Data
                     raw_data = yf.download(tickers_to_fetch, start=start_date, end=end_date, progress=False)
                     data = raw_data['Close'] if 'Close' in raw_data.columns else raw_data
 
                     if data.empty:
-                        st.error("No historical data found for these tickers in this timeframe.")
+                        st.error("No historical data found for these tickers.")
                     else:
-                        # 3. Portfolio Calculations
+                        # 1. Calculations
                         returns = data[custom_tickers].pct_change().dropna()
                         weights_arr = [custom_weights[t]/100 for t in custom_tickers]
                         port_returns = (returns * weights_arr).sum(axis=1)
                         cumulative_growth = (1 + port_returns).cumprod() * 100
                         
-                        # Metrics Calculation
+                        # 2. Metrics
                         port_vol = port_returns.std() * (252**0.5) * 100
                         port_perf = (cumulative_growth.iloc[-1] - 100)
                         max_dd = ((cumulative_growth / cumulative_growth.cummax()) - 1).min() * 100
-                        
-                        # NEW: Sharpe Ratio Logic (2% risk-free rate assumption)
                         rf_daily = 0.02 / 252
-                        excess_returns = port_returns - rf_daily
-                        sharpe_ratio = (excess_returns.mean() / port_returns.std()) * (252**0.5) if port_returns.std() != 0 else 0
+                        sharpe_ratio = ((port_returns - rf_daily).mean() / port_returns.std()) * (252**0.5) if port_returns.std() != 0 else 0
                         
-                        # 4. UI Output - Expanded to 5 columns
+                        # 3. Display Metrics
                         m1, m2, m3, m4, m5 = st.columns(5)
                         m1.metric("Strategy Return", f"{port_perf:+.2f}%")
                         m2.metric("Max Drawdown", f"{max_dd:.2f}%", delta_color="inverse")
                         m3.metric("Volatility Score", f"{port_vol:.1f}%", help="Avg S&P Vol is 15-18%.")
-                        m4.metric("Sharpe Ratio", f"{sharpe_ratio:.2f}", help="Risk-adjusted return. Higher is better.")
+                        m4.metric("Sharpe Ratio", f"{sharpe_ratio:.2f}", help="Risk-adjusted return.")
 
                         plot_df = pd.DataFrame({"Your Strategy": cumulative_growth}, index=cumulative_growth.index)
-
                         if benchmark_choice != "None":
                             bench_ticker = benchmark_map[benchmark_choice]
                             bench_growth = (1 + data[bench_ticker].pct_change().dropna()).cumprod() * 100
-                            bench_perf = bench_growth.iloc[-1] - 100
                             plot_df[f"Benchmark ({bench_ticker})"] = bench_growth
-                            m5.metric(f"vs {benchmark_choice.split(' ')[0]}", f"{(port_perf - bench_perf):+.2f}%")
+                            m5.metric(f"vs {benchmark_choice.split(' ')[0]}", f"{(port_perf - (bench_growth.iloc[-1]-100)):+.2f}%")
 
-                        # 5. Sharpe Ratio Educational Expander
                         with st.expander("🎓 What is the Sharpe Ratio? (Novice Guide)"):
-                            st.write("""
-                            The **Sharpe Ratio** tells you if your returns are 'worth it' or if you are just taking too much unnecessary risk. 
-                            
-                            * **The Concept:** If two investors both made 10%, but Investor A had a smooth ride while Investor B had massive price swings, Investor A has a higher Sharpe Ratio.
-                            * **How to read the score:**
-                                * **Under 1.0:** Acceptable, but high risk for the return.
-                                * **1.0 to 1.9:** Good. You are being well-compensated for the risk.
-                                * **2.0 to 2.9:** Very Good. Professional-level risk management.
-                                * **3.0+:** Excellent.
-                            """)
+                            st.write("The Sharpe Ratio measures if your returns are worth the risk. Scores above 1.0 are good; 2.0+ is excellent.")
 
                         st.line_chart(plot_df)
                         
-                        # Asset Contribution
                         st.subheader("📊 Individual Asset Performance")
                         asset_perf = {t: ((data[t].iloc[-1] / data[t].iloc[0]) - 1) * 100 for t in custom_tickers}
                         st.bar_chart(pd.DataFrame.from_dict(asset_perf, orient='index', columns=['Return %']))
+
+                        # --- NEW: CORRELATION MATRIX SECTION ---
+                        st.divider()
+                        st.subheader("🔗 Diversification Check: Correlation Matrix")
+                        
+                        corr_matrix = returns.corr()
+                        st.write("This table shows how closely your assets move together (1.0 is a perfect match).")
+                        
+                        # Apply a heatmap style for easy reading
+                        st.dataframe(corr_matrix.style.background_gradient(cmap='RdYlGn_r', axis=None).format("{:.2f}"))
+
+                        with st.expander("🎓 What is Correlation? (Novice Guide)"):
+                            st.write("""
+                            **Correlation** measures how much two assets move in the same direction at the same time:
+                            * **1.0 (Red):** Perfect Correlation. If one crashes, the other likely will too.
+                            * **0.0 (Yellow):** No Correlation. These assets move independently. 
+                            * **Negative (Green):** Inverse Correlation. When one goes down, the other goes up.
+                            
+                            **Strategy Tip:** To build a safer portfolio, look for assets with **Low (0.0 to 0.4)** or **Negative** correlation.
+                            """)
                         
                 except Exception as e:
                     st.error(f"Calculation Error: {str(e)}")

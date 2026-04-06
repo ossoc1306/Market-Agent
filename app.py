@@ -8,47 +8,47 @@ from datetime import datetime
 # PAGE CONFIG
 st.set_page_config(page_title="Multi-Asset Terminal", layout="wide")
 
-# --- PORTFOLIO DEFINITIONS (Updated with Historical & Regime Data) ---
+# --- PORTFOLIO DEFINITIONS (Updated with Historical, Regime & Yield Data) ---
 PORTFOLIOS = {
     "All-Weather (Dalio)": {
         "weights": {"VTI": 0.30, "TLT": 0.40, "IEF": 0.15, "GLD": 0.075, "DBC": 0.075},
-        "hist_ret": "6.0%", "stag_pot": "High"
+        "hist_ret": "6.0%", "stag_pot": "High", "est_yield": 2.1
     },
     "60/40 Portfolio": {
         "weights": {"VTI": 0.60, "BND": 0.40},
-        "hist_ret": "8.4%", "stag_pot": "Low"
+        "hist_ret": "8.4%", "stag_pot": "Low", "est_yield": 2.8
     },
     "Fugger Portfolio": {
         "weights": {"VTI": 0.25, "VNQ": 0.25, "BND": 0.25, "GLD": 0.25},
-        "hist_ret": "6.1%", "stag_pot": "High"
+        "hist_ret": "6.1%", "stag_pot": "High", "est_yield": 2.4
     },
     "Permanent Portfolio": {
         "weights": {"VTI": 0.25, "TLT": 0.25, "BIL": 0.25, "GLD": 0.25},
-        "hist_ret": "5.9%", "stag_pot": "High"
+        "hist_ret": "5.9%", "stag_pot": "High", "est_yield": 2.2
     },
     "Golden Butterfly": {
         "weights": {"VTI": 0.20, "IJS": 0.20, "TLT": 0.20, "SHV": 0.20, "GLD": 0.20},
-        "hist_ret": "7.2%", "stag_pot": "High"
+        "hist_ret": "7.2%", "stag_pot": "High", "est_yield": 2.3
     },
     "Three-Fund": {
         "weights": {"VTI": 0.34, "VXUS": 0.33, "BND": 0.33},
-        "hist_ret": "8.9%", "stag_pot": "Low"
+        "hist_ret": "8.9%", "stag_pot": "Low", "est_yield": 2.6
     },
     "Coffeehouse": {
         "weights": {"VOO": 0.10, "IJS": 0.10, "IJV": 0.10, "VEA": 0.10, "VNQ": 0.10, "VIG": 0.10, "AGG": 0.40},
-        "hist_ret": "8.2%", "stag_pot": "Low-Mod"
+        "hist_ret": "8.2%", "stag_pot": "Low-Mod", "est_yield": 2.9
     },
     "Ivy League (Swensen)": {
         "weights": {"VTI": 0.30, "VEA": 0.15, "VWO": 0.05, "VNQ": 0.20, "IEF": 0.15, "TIP": 0.15},
-        "hist_ret": "7.5%", "stag_pot": "Moderate"
+        "hist_ret": "7.5%", "stag_pot": "Moderate", "est_yield": 3.1
     },
     "Warren Buffett": {
         "weights": {"VOO": 0.90, "BIL": 0.10},
-        "hist_ret": "11.2%", "stag_pot": "Low"
+        "hist_ret": "11.2%", "stag_pot": "Low", "est_yield": 1.7
     },
     "Global Asset Allocation": {
         "weights": {"VTI": 0.18, "VEA": 0.135, "VWO": 0.045, "LQD": 0.18, "TLT": 0.18, "GLD": 0.10, "DBC": 0.10, "VNQ": 0.08},
-        "hist_ret": "7.8%", "stag_pot": "Moderate"
+        "hist_ret": "7.8%", "stag_pot": "Moderate", "est_yield": 2.5
     }
 }
 
@@ -60,8 +60,8 @@ with st.sidebar:
         st.rerun()
     st.info("Manual refresh clears the cache and pulls the latest data.")
 
-# --- 1. TABS NAVIGATION ---
-tab_terminal, tab_lab = st.tabs(["🛡️ Multi-Asset Terminal", "📈 Portfolio Lab"])
+# --- 1. TABS NAVIGATION (Added Rebalance Tab) ---
+tab_terminal, tab_lab, tab_rebalance = st.tabs(["🛡️ Multi-Asset Terminal", "📈 Portfolio Lab", "⚖️ Rebalance & Income"])
 
 with tab_terminal:
     st.title("🛡️ Multi-Asset Terminal")
@@ -227,7 +227,7 @@ with tab_terminal:
         for e in get_news_feed("https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114") or []:
             st.markdown(f"- [{e['title']}]({e['link']})")
 
-# --- TAB 2: PORTFOLIO LAB (Updated with New Columns) ---
+# --- TAB 2: PORTFOLIO LAB ---
 with tab_lab:
     st.header("📈 Lazy Portfolio Performance Lab")
     
@@ -264,3 +264,50 @@ with tab_lab:
             })
         
         st.dataframe(pd.DataFrame(res).sort_values(by="YTD %", ascending=False), use_container_width=True, hide_index=True)
+
+# --- TAB 3: REBALANCE & INCOME SECTION ---
+with tab_rebalance:
+    st.header("⚖️ Rebalance & Income Projection")
+    st.write("Determine how much to rebalance and see your estimated annual cash flow.")
+    
+    col_input, col_stats = st.columns([2, 1])
+    
+    with col_input:
+        target_strategy = st.selectbox("Select Strategy to Analyze", list(PORTFOLIOS.keys()))
+        target_weights = PORTFOLIOS[target_strategy]["weights"]
+        
+        st.subheader("Current Holdings")
+        current_vals = {}
+        input_cols = st.columns(3)
+        for i, ticker in enumerate(target_weights.keys()):
+            current_vals[ticker] = input_cols[i % 3].number_input(f"{ticker} Balance ($)", min_value=0.0, value=10000.0, step=1000.0)
+    
+    total_portfolio_value = sum(current_vals.values())
+    portfolio_yield_pct = PORTFOLIOS[target_strategy]["est_yield"]
+    annual_income = total_portfolio_value * (portfolio_yield_pct / 100)
+
+    with col_stats:
+        st.subheader("💰 Income Projection")
+        st.metric("Total Portfolio Value", f"${total_portfolio_value:,.2f}")
+        st.metric("Est. Annual Income", f"${annual_income:,.2f}", f"{portfolio_yield_pct}% Yield")
+        st.write(f"**Monthly Average:** ${annual_income/12:,.2f}")
+        st.caption("Note: Yields are based on trailing twelve-month (TTM) averages.")
+
+    st.divider()
+    
+    st.subheader("🛠️ Rebalancing Action Plan")
+    rebalance_data = []
+    for ticker, weight in target_weights.items():
+        target_val = total_portfolio_value * weight
+        actual_val = current_vals[ticker]
+        diff = target_val - actual_val
+        rebalance_data.append({
+            "Asset": ticker,
+            "Target Allocation": f"{weight*100:.1f}%",
+            "Current Allocation": f"{(actual_val/total_portfolio_value)*100:.1f}%" if total_portfolio_value > 0 else "0%",
+            "Current Value": f"${actual_val:,.2f}",
+            "Target Value": f"${target_val:,.2f}",
+            "Required Action": f"🟢 BUY ${diff:,.2f}" if diff > 0 else f"🔴 SELL ${abs(diff):,.2f}"
+        })
+    
+    st.table(pd.DataFrame(rebalance_data))

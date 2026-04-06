@@ -8,18 +8,48 @@ from datetime import datetime
 # PAGE CONFIG
 st.set_page_config(page_title="Multi-Asset Terminal", layout="wide")
 
-# --- PORTFOLIO DEFINITIONS (Restored Full Detail) ---
+# --- PORTFOLIO DEFINITIONS (Updated with Historical & Regime Data) ---
 PORTFOLIOS = {
-    "All-Weather (Dalio)": {"VTI": 0.30, "TLT": 0.40, "IEF": 0.15, "GLD": 0.075, "DBC": 0.075},
-    "60/40 Portfolio": {"VTI": 0.60, "BND": 0.40},
-    "Fugger Portfolio": {"VTI": 0.25, "VNQ": 0.25, "BND": 0.25, "GLD": 0.25},
-    "Permanent Portfolio": {"VTI": 0.25, "TLT": 0.25, "BIL": 0.25, "GLD": 0.25},
-    "Golden Butterfly": {"VTI": 0.20, "IJS": 0.20, "TLT": 0.20, "SHV": 0.20, "GLD": 0.20},
-    "Three-Fund": {"VTI": 0.34, "VXUS": 0.33, "BND": 0.33},
-    "Coffeehouse": {"VOO": 0.10, "IJS": 0.10, "IJV": 0.10, "VEA": 0.10, "VNQ": 0.10, "VIG": 0.10, "AGG": 0.40},
-    "Ivy League (Swensen)": {"VTI": 0.30, "VEA": 0.15, "VWO": 0.05, "VNQ": 0.20, "IEF": 0.15, "TIP": 0.15},
-    "Warren Buffett": {"VOO": 0.90, "BIL": 0.10},
-    "Global Asset Allocation": {"VTI": 0.18, "VEA": 0.135, "VWO": 0.045, "LQD": 0.18, "TLT": 0.18, "GLD": 0.10, "DBC": 0.10, "VNQ": 0.08}
+    "All-Weather (Dalio)": {
+        "weights": {"VTI": 0.30, "TLT": 0.40, "IEF": 0.15, "GLD": 0.075, "DBC": 0.075},
+        "hist_ret": "6.0%", "stag_pot": "High"
+    },
+    "60/40 Portfolio": {
+        "weights": {"VTI": 0.60, "BND": 0.40},
+        "hist_ret": "8.4%", "stag_pot": "Low"
+    },
+    "Fugger Portfolio": {
+        "weights": {"VTI": 0.25, "VNQ": 0.25, "BND": 0.25, "GLD": 0.25},
+        "hist_ret": "6.1%", "stag_pot": "High"
+    },
+    "Permanent Portfolio": {
+        "weights": {"VTI": 0.25, "TLT": 0.25, "BIL": 0.25, "GLD": 0.25},
+        "hist_ret": "5.9%", "stag_pot": "High"
+    },
+    "Golden Butterfly": {
+        "weights": {"VTI": 0.20, "IJS": 0.20, "TLT": 0.20, "SHV": 0.20, "GLD": 0.20},
+        "hist_ret": "7.2%", "stag_pot": "High"
+    },
+    "Three-Fund": {
+        "weights": {"VTI": 0.34, "VXUS": 0.33, "BND": 0.33},
+        "hist_ret": "8.9%", "stag_pot": "Low"
+    },
+    "Coffeehouse": {
+        "weights": {"VOO": 0.10, "IJS": 0.10, "IJV": 0.10, "VEA": 0.10, "VNQ": 0.10, "VIG": 0.10, "AGG": 0.40},
+        "hist_ret": "8.2%", "stag_pot": "Low-Mod"
+    },
+    "Ivy League (Swensen)": {
+        "weights": {"VTI": 0.30, "VEA": 0.15, "VWO": 0.05, "VNQ": 0.20, "IEF": 0.15, "TIP": 0.15},
+        "hist_ret": "7.5%", "stag_pot": "Moderate"
+    },
+    "Warren Buffett": {
+        "weights": {"VOO": 0.90, "BIL": 0.10},
+        "hist_ret": "11.2%", "stag_pot": "Low"
+    },
+    "Global Asset Allocation": {
+        "weights": {"VTI": 0.18, "VEA": 0.135, "VWO": 0.045, "LQD": 0.18, "TLT": 0.18, "GLD": 0.10, "DBC": 0.10, "VNQ": 0.08},
+        "hist_ret": "7.8%", "stag_pot": "Moderate"
+    }
 }
 
 # --- SIDEBAR ---
@@ -30,7 +60,7 @@ with st.sidebar:
         st.rerun()
     st.info("Manual refresh clears the cache and pulls the latest data.")
 
-# --- 1. TABS NAVIGATION (Alpha Removed as requested) ---
+# --- 1. TABS NAVIGATION ---
 tab_terminal, tab_lab = st.tabs(["🛡️ Multi-Asset Terminal", "📈 Portfolio Lab"])
 
 with tab_terminal:
@@ -158,7 +188,7 @@ with tab_terminal:
 
     st.divider()
 
-    # --- DEEP DIVES (RE-INTEGRATED) ---
+    # --- DEEP DIVES ---
     col_left, col_right = st.columns(2)
     with col_left:
         with st.expander("🔍 Momentum & Trend Layers (SPX, QQQ, VXUS)", expanded=True):
@@ -197,10 +227,12 @@ with tab_terminal:
         for e in get_news_feed("https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114") or []:
             st.markdown(f"- [{e['title']}]({e['link']})")
 
-# --- TAB 2: PORTFOLIO LAB (FULLY RESTORED) ---
+# --- TAB 2: PORTFOLIO LAB (Updated with New Columns) ---
 with tab_lab:
     st.header("📈 Lazy Portfolio Performance Lab")
-    all_p_tickers = list(set([t for p in PORTFOLIOS.values() for t in p.keys()]))
+    
+    # Get flat list of tickers for live YTD calculation
+    all_p_tickers = list(set([t for p in PORTFOLIOS.values() for t in p["weights"].keys()]))
     
     @st.cache_data(ttl=3600)
     def get_ytd_portfolio_data(tickers):
@@ -217,13 +249,18 @@ with tab_lab:
     p_prices = get_ytd_portfolio_data(all_p_tickers)
     if p_prices:
         res = []
-        for name, weights in PORTFOLIOS.items():
+        for name, data in PORTFOLIOS.items():
+            weights = data["weights"]
             # Build string for weights display
             weight_strings = [f"{t}: {int(w*100)}%" for t, w in weights.items()]
             ytd_perf = sum(((p_prices[t]["current"]/p_prices[t]["ytd_start"])-1) * w for t, w in weights.items() if t in p_prices)
+            
             res.append({
                 "Portfolio Design": name, 
                 "Allocation Weighting": ", ".join(weight_strings),
-                "YTD %": round(ytd_perf * 100, 2)
+                "YTD %": round(ytd_perf * 100, 2),
+                "Ann. Return (Since 2008)": data["hist_ret"],
+                "Stagflation Potential": data["stag_pot"]
             })
+        
         st.dataframe(pd.DataFrame(res).sort_values(by="YTD %", ascending=False), use_container_width=True, hide_index=True)

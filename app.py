@@ -60,8 +60,13 @@ with st.sidebar:
         st.rerun()
     st.info("Manual refresh clears the cache and pulls the latest data.")
 
-# --- 1. TABS NAVIGATION (Added Rebalance Tab) ---
-tab_terminal, tab_lab, tab_rebalance = st.tabs(["🛡️ Multi-Asset Terminal", "📈 Portfolio Lab", "⚖️ Rebalance & Income"])
+# --- 1. TABS NAVIGATION (Restructured with Architect Tab) ---
+tab_terminal, tab_lab, tab_rebalance, tab_architect = st.tabs([
+    "🛡️ Multi-Asset Terminal", 
+    "📈 Portfolio Lab", 
+    "⚖️ Rebalance & Income",
+    "🔬 Strategy Architect"
+])
 
 with tab_terminal:
     st.title("🛡️ Multi-Asset Terminal")
@@ -265,7 +270,7 @@ with tab_lab:
         
         st.dataframe(pd.DataFrame(res).sort_values(by="YTD %", ascending=False), use_container_width=True, hide_index=True)
 
-# --- TAB 3: REBALANCE & INCOME SECTION (Updated with Auto-Population) ---
+# --- TAB 3: REBALANCE & INCOME SECTION ---
 with tab_rebalance:
     st.header("⚖️ Rebalance & Income Projection")
     st.write("Define your target portfolio size to automatically see the suggested construction.")
@@ -277,7 +282,6 @@ with tab_rebalance:
         target_weights = PORTFOLIOS[target_strategy]["weights"]
         
         st.subheader("Portfolio Configuration")
-        # 1. User sets the master target number
         total_portfolio_value = st.number_input(
             "Target Total Portfolio Value ($)", 
             min_value=0.0, 
@@ -293,11 +297,8 @@ with tab_rebalance:
         current_vals = {}
         input_cols = st.columns(3)
         
-        # 2. Automatically populate "Actual Holdings" inputs based on the Target Value
         for i, (ticker, weight) in enumerate(target_weights.items()):
             suggested_amount = total_portfolio_value * weight
-            
-            # The 'value' parameter here pulls the live calculation into the box
             current_vals[ticker] = input_cols[i % 3].number_input(
                 f"Actual {ticker} ($)", 
                 min_value=0.0, 
@@ -305,7 +306,6 @@ with tab_rebalance:
                 step=100.0
             )
     
-    # 3. Income Calculations
     portfolio_yield_pct = PORTFOLIOS[target_strategy]["est_yield"]
     annual_income = total_portfolio_value * (portfolio_yield_pct / 100)
 
@@ -325,7 +325,6 @@ with tab_rebalance:
         actual_val = current_vals[ticker]
         diff = target_val - actual_val
         
-        # Determine status: Balanced (within $1) or Buy/Sell
         if abs(diff) < 1.0:
             action = "✅ Balanced"
         elif diff > 0:
@@ -345,8 +344,7 @@ with tab_rebalance:
     st.table(pd.DataFrame(rebalance_data))
 
 # --- TAB 4: STRATEGY ARCHITECT (Backtesting & Stress Tests) ---
-with tab_rebalance: # Use your existing tab list logic
-    # (Optional: Add a new tab to your st.tabs list if you haven't already)
+with tab_architect:
     st.header("🔬 Custom Strategy & Stress Test")
     
     REGIMES = {

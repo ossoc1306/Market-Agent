@@ -464,7 +464,7 @@ with tab_architect:
                         st.write("This table shows how closely your assets move together (1.0 is a perfect match).")
                         
                         # Apply a heatmap style for easy reading
-                        st.dataframe(corr_matrix.style.background_gradient(cmap='RdYlGn_r', axis=None).format("{:.2f}"))
+                        st.dataframe(corr_matrix.style.format("{:.2f}"))
 
                         with st.expander("🎓 What is Correlation? (Novice Guide)"):
                             st.write("""

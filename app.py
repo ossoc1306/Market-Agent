@@ -343,16 +343,28 @@ with tab_rebalance:
     
     st.table(pd.DataFrame(rebalance_data))
 
-# --- TAB 4: STRATEGY ARCHITECT (Custom Dates & Stress Tests) ---
+# --- TAB 4: STRATEGY ARCHITECT (Custom Dates, Multi-Benchmark & Stress Tests) ---
 with tab_architect:
     st.header("🔬 Custom Strategy & Stress Test")
     
-    # Keep regimes for "Quick Select" functionality
+    # REGIME DEFINITIONS & SUMMARIES
     REGIMES = {
-        "2008 Housing Crisis": ("2007-10-01", "2009-03-09"),
-        "2020 COVID Crash": ("2020-02-19", "2020-03-23"),
-        "2022 Rate Hike Shock": ("2022-01-01", "2022-12-31"),
-        "Bull Market Run (Recent)": ("2023-01-01", datetime.now().strftime("%Y-%m-%d"))
+        "2008 Housing Crisis": {
+            "dates": ("2007-10-01", "2009-03-09"),
+            "summary": "The Great Recession triggered by the housing collapse. S&P 500 fell ~50%; flight to Treasuries and Gold."
+        },
+        "2020 COVID Crash": {
+            "dates": ("2020-02-19", "2020-03-23"),
+            "summary": "Swift bear market due to global lockdowns. Market bottomed after massive Fed intervention."
+        },
+        "2022 Rate Hike Shock": {
+            "dates": ("2022-01-01", "2022-12-31"),
+            "summary": "Stocks and bonds crashed simultaneously as the Fed fought 40-year high inflation."
+        },
+        "Bull Market Run (Recent)": {
+            "dates": ("2023-01-01", datetime.now().strftime("%Y-%m-%d")),
+            "summary": "Defined by the AI Revolution and resilient economy. Tech led most of the gains."
+        }
     }
 
     col_build, col_dates = st.columns([2, 1])
@@ -369,58 +381,68 @@ with tab_architect:
             custom_weights[ticker] = c_weight_cols[i].number_input(f"{ticker} %", min_value=0, max_value=100, value=100//len(custom_tickers))
         
         total_w = sum(custom_weights.values())
-        compare_spx = st.checkbox("Compare against S&P 500 (SPY)", value=True)
+        
+        # NEW: Multi-Benchmark Selector
+        benchmark_choice = st.selectbox(
+            "Compare against Benchmark:", 
+            ["S&P 500 (SPY)", "Nasdaq 100 (QQQ)", "Bitcoin (BTC-USD)", "None"]
+        )
+        benchmark_map = {"S&P 500 (SPY)": "SPY", "Nasdaq 100 (QQQ)": "QQQ", "Bitcoin (BTC-USD)": "BTC-USD"}
 
     with col_dates:
         st.subheader("📅 Select Timeframe")
-        
-        # New Feature: Custom Date Range Selector
-        date_range = st.date_input(
-            "Select Start and End Dates",
-            value=[datetime(2020, 1, 1), datetime.now()],
-            max_value=datetime.now()
-        )
+        date_range = st.date_input("Select Start and End Dates", value=[datetime(2020, 1, 1), datetime.now()], max_value=datetime.now())
         
         st.write("---")
         st.caption("Quick Select Historical Regimes:")
         quick_regime = st.selectbox("Apply Preset Range:", ["Custom"] + list(REGIMES.keys()))
         
-        # If a preset is chosen, it overrides the date_range logic in the backend
         if quick_regime != "Custom":
-            start_date, end_date = REGIMES[quick_regime]
+            start_date, end_date = REGIMES[quick_regime]["dates"]
+            st.info(f"**Market Context:** {REGIMES[quick_regime]['summary']}")
         elif len(date_range) == 2:
             start_date, end_date = date_range
         else:
             start_date = end_date = None
 
     if st.button("🚀 Run Stress Test") and total_w == 100 and start_date:
-        with st.spinner("Analyzing performance over selected timeframe..."):
+        with st.spinner(f"Analyzing strategy performance..."):
             try:
-                all_fetch = custom_tickers + (["SPY"] if compare_spx else [])
-                data = yf.download(all_fetch, start=start_date, end=end_date, progress=False)['Close']
+                # Fetching strategy tickers + optional benchmark
+                tickers_to_fetch = custom_tickers.copy()
+                if benchmark_choice != "None":
+                    tickers_to_fetch.append(benchmark_map[benchmark_choice])
                 
-                # Calculations
+                data = yf.download(tickers_to_fetch, start=start_date, end=end_date, progress=False)['Close']
+                
+                # Portfolio Calculations
                 returns = data[custom_tickers].pct_change().dropna()
                 weights_arr = [custom_weights[t]/100 for t in custom_tickers]
                 port_returns = (returns * weights_arr).sum(axis=1)
                 cumulative_growth = (1 + port_returns).cumprod() * 100
                 
-                # Volatility & Metrics
+                # Metrics
                 port_vol = port_returns.std() * (252**0.5) * 100
                 port_perf = (cumulative_growth.iloc[-1] - 100)
                 max_dd = ((cumulative_growth / cumulative_growth.cummax()) - 1).min() * 100
                 
-                # Metrics Row
+                # Plot setup
+                plot_df = pd.DataFrame({"Your Strategy": cumulative_growth})
+                
+                # Comparison Metric Column
                 m1, m2, m3, m4 = st.columns(4)
                 m1.metric("Strategy Return", f"{port_perf:+.2f}%")
                 m2.metric("Max Drawdown", f"{max_dd:.2f}%", delta_color="inverse")
-                m3.metric("Volatility Score", f"{port_vol:.1f}%", help="Annualized Standard Deviation. Avg S&P Vol is 15-18%.")
-                
-                plot_df = pd.DataFrame({"Your Strategy": cumulative_growth})
-                if compare_spx:
-                    spy_growth = (1 + data["SPY"].pct_change().dropna()).cumprod() * 100
-                    plot_df["S&P 500 (SPY)"] = spy_growth
-                    m4.metric("Strategy vs the S&P", f"{(port_perf - (spy_growth.iloc[-1]-100)):+.2f}%")
+                m3.metric("Volatility Score", f"{port_vol:.1f}%", help="Annualized Std Dev. Context: S&P 500 Avg is 15-18%.")
+
+                if benchmark_choice != "None":
+                    bench_ticker = benchmark_map[benchmark_choice]
+                    bench_growth = (1 + data[bench_ticker].pct_change().dropna()).cumprod() * 100
+                    bench_perf = bench_growth.iloc[-1] - 100
+                    plot_df[f"Benchmark ({bench_ticker})"] = bench_growth
+                    
+                    # Renamed dynamic metric
+                    m4.metric(f"Strategy vs {benchmark_choice.split(' ')[0]}", f"{(port_perf - bench_perf):+.2f}%")
 
                 st.line_chart(plot_df)
                 

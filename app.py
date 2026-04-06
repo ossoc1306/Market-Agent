@@ -412,17 +412,28 @@ with tab_architect:
                 m1, m2, m3, m4 = st.columns(4)
                 m1.metric("Strategy Return", f"{cumulative_growth.iloc[-1]-100:+.2f}%")
                 m2.metric("Max Drawdown", f"{(((cumulative_growth / cumulative_growth.cummax()) - 1).min() * 100):.2f}%", delta_color="inverse")
-                m3.metric("Volatility Score", f"{port_vol:.1f}%", help="Annualized Standard Deviation.")
+                
+                # REFINED VOLATILITY SCORE
+                m3.metric(
+                    "Volatility Score", 
+                    f"{port_vol:.1f}%", 
+                    help="Annualized Standard Deviation. For context, the average S&P 500 Volatility is 15-18%."
+                )
                 
                 plot_df = pd.DataFrame({"Your Strategy": cumulative_growth})
+                
+                # REFINED COMPARISON LABEL
                 if compare_spx:
                     spy_growth = (1 + data["SPY"].pct_change().dropna()).cumprod() * 100
                     plot_df["S&P 500 (SPY)"] = spy_growth
-                    m4.metric("Market Alpha", f"{(cumulative_growth.iloc[-1] - spy_growth.iloc[-1]):+.2f}%")
+                    
+                    # Difference between Strategy and S&P
+                    strategy_vs_spy = (cumulative_growth.iloc[-1] - spy_growth.iloc[-1])
+                    m4.metric("Strategy vs the S&P", f"{strategy_vs_spy:+.2f}%")
 
                 st.line_chart(plot_df)
 
-                # --- NEW: ASSET CONTRIBUTION SECTION ---
+                # --- ASSET CONTRIBUTION SECTION ---
                 st.subheader("📊 Individual Asset Performance")
                 st.write("How each ticker performed during this specific regime:")
                 

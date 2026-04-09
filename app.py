@@ -389,27 +389,35 @@ with tab_architect:
 
     with col_dates:
         st.subheader("📅 Select Timeframe")
-        date_range = st.date_input("Select Start and End Dates", value=[datetime(2020, 1, 1), datetime.now()])
+        # Streamlit date_input returns a tuple for ranges. 
+        date_range = st.date_input("Select Start and End Dates", value=(datetime(2020, 1, 1), datetime.now()))
         
         st.write("---")
         st.caption("Quick Select Historical Regimes:")
         quick_regime = st.selectbox("Apply Preset Range:", ["Custom"] + list(REGIMES.keys()))
         
+        # Initialize variables
+        start_date = None
+        end_date = None
+
         if quick_regime != "Custom":
             start_date, end_date = REGIMES[quick_regime]["dates"]
             st.info(f"**Market Context:** {REGIMES[quick_regime]['summary']}")
-        elif isinstance(date_range, list) and len(date_range) == 2:
+        # Check if selection is complete (tuple length 2)
+        elif isinstance(date_range, tuple) and len(date_range) == 2:
             start_date, end_date = date_range
         else:
-            start_date = end_date = None
+            # Selection is in progress
+            start_date = None
+            end_date = None
 
     if st.button("🚀 Run Stress Test"):
         if total_w != 100:
             st.error(f"⚠️ Total weight must be exactly 100%. Your current total is **{total_w}%**.")
         elif not custom_tickers:
             st.error("⚠️ Please enter at least one ticker symbol.")
-        elif not start_date:
-            st.warning("⚠️ Please select a full date range.")
+        elif start_date is None or end_date is None:
+            st.warning("⚠️ Please select a full date range (click both start and end dates on the calendar).")
         else:
             with st.spinner(f"Analyzing strategy performance..."):
                 try:

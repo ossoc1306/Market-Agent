@@ -61,11 +61,12 @@ with st.sidebar:
     st.info("Manual refresh clears the cache and pulls the latest data.")
 
 # --- 1. TABS NAVIGATION ---
-tab_terminal, tab_lab, tab_rebalance, tab_architect = st.tabs([
+tab_terminal, tab_lab, tab_rebalance, tab_architect, tab_rotation = st.tabs([
     "🛡️ Multi-Asset Terminal", 
     "📈 Portfolio Lab", 
     "⚖️ Rebalance & Income",
-    "🔬 Strategy Architect"
+    "🔬 Strategy Architect",
+    "🔄 Rotation Radar"
 ])
 
 with tab_terminal:
@@ -525,3 +526,110 @@ with tab_architect:
                         
                 except Exception as e:
                     st.error(f"Calculation Error: {str(e)}")
+
+# --- TAB 5: SECTOR ROTATION RADAR (Exhaustion & Seasonality) ---
+with tab_rotation:
+    st.header("🔄 Sector Rotation Radar")
+    st.write("Measure technical exhaustion and historical seasonality to anticipate capital rotation.")
+    
+    # --- ROTATION DATA FUNCTIONS ---
+    @st.cache_data(ttl=3600)
+    def get_technical_exhaustion(ticker):
+        try:
+            df = yf.download(ticker, period="1y", progress=False)['Close']
+            if df.empty: return None
+            
+            # Calculate 50-day Moving Average and Standard Deviation
+            sma_50 = df.rolling(window=50).mean()
+            std_50 = df.rolling(window=50).std()
+            
+            current_price = float(df.iloc[-1].squeeze())
+            current_sma = float(sma_50.iloc[-1].squeeze())
+            current_std = float(std_50.iloc[-1].squeeze())
+            
+            if current_std == 0: return None
+            
+            # Z-Score Calculation (Rubber Band Stretch)
+            z_score = (current_price - current_sma) / current_std
+            return current_price, current_sma, z_score
+        except: return None
+
+    @st.cache_data(ttl=3600)
+    def get_seasonality(ticker):
+        try:
+            # Pull 10 years of data for deep historical context
+            df = yf.download(ticker, period="10y", progress=False)['Close']
+            if df.empty: return None
+            
+            # Resample to monthly and calculate month-over-month returns
+            monthly_data = df.resample('ME').last()
+            monthly_returns = monthly_data.pct_change() * 100
+            
+            current_month = datetime.now().month
+            current_month_name = datetime.now().strftime('%B')
+            
+            # Isolate only the historical data for the current month
+            month_returns = monthly_returns[monthly_returns.index.month == current_month].dropna()
+            
+            if month_returns.empty: return None
+            
+            win_rate = float((month_returns > 0).mean().squeeze()) * 100
+            avg_return = float(month_returns.mean().squeeze())
+            
+            return win_rate, avg_return, current_month_name
+        except: return None
+
+    # --- UI & ANALYSIS ENGINE ---
+    col_input, col_info = st.columns([1, 2])
+    with col_input:
+        target_ticker = st.text_input("Enter Target Sector/Asset (e.g., SMH, XLK, XLE)", "SMH").upper()
+        run_radar = st.button("🚀 Analyze Rotation Probabilities")
+        
+    with col_info:
+        st.info("💡 **How to read this:** A Z-Score over 2.0 indicates an asset is highly overextended. If the Z-Score is extreme BUT the historical Win Rate for this month is poor, the probability of a sharp fade or rotation is very high.")
+
+    if run_radar and target_ticker:
+        with st.spinner(f"Running Exhaustion and Seasonality models for {target_ticker}..."):
+            exhaustion_data = get_technical_exhaustion(target_ticker)
+            seasonality_data = get_seasonality(target_ticker)
+            
+            if exhaustion_data and seasonality_data:
+                price, sma, z_score = exhaustion_data
+                win_rate, avg_return, month_name = seasonality_data
+                
+                st.divider()
+                st.subheader(f"📊 {target_ticker} | Statistical Profile")
+                
+                # Setup Display Columns
+                m1, m2, m3, m4 = st.columns(4)
+                
+                # Z-Score Metric Logic
+                if z_score > 2:
+                    z_status, z_color = "🔴 Overbought", "inverse"
+                elif z_score < -2:
+                    z_status, z_color = "🟢 Oversold", "normal"
+                else:
+                    z_status, z_color = "🟡 Neutral", "off"
+
+                m1.metric("Current Price", f"${price:,.2f}", f"50-SMA: ${sma:,.2f}")
+                m2.metric("Technical Z-Score", f"{z_score:+.2f}", z_status, delta_color=z_color)
+                m3.metric(f"{month_name} Win Rate (10y)", f"{win_rate:.0f}%", "Historical Edge" if win_rate > 55 else "Poor Seasonality" if win_rate < 45 else "")
+                m4.metric(f"{month_name} Avg Return", f"{avg_return:+.2f}%")
+                
+                # --- SYNTHESIS REPORT ---
+                st.write("---")
+                st.write("### 🧠 AI Synthesis & Rotation Probability")
+                
+                if z_score > 2 and win_rate < 50:
+                    st.error(f"**High Fade Probability:** {target_ticker} is statistically overextended (Z-Score > 2), and historical seasonality for {month_name} is exceptionally weak. The math favors capital rotating out of this asset shortly.")
+                elif z_score > 2 and win_rate > 50:
+                    st.warning(f"**Caution (Trend vs Gravity):** {target_ticker} is highly overextended, but historically performs very well in {month_name}. Momentum may continue, but downside risk is elevated due to the stretched rubber band.")
+                elif z_score < -2 and win_rate > 50:
+                    st.success(f"**High Bounce/Rotation Probability:** {target_ticker} is statistically oversold and historical seasonality for {month_name} is strong. This is a high-probability zone for capital to rotate *into* this asset.")
+                elif z_score < -2 and win_rate < 50:
+                    st.warning(f"**Falling Knife Warning:** {target_ticker} is heavily oversold, but {month_name} is historically a terrible month for this asset. Wait for confirmation before assuming capital is rotating back in.")
+                else:
+                    st.info(f"**Holding Pattern:** {target_ticker} is trading within normal statistical ranges (Z-Score between -2 and 2). No extreme exhaustion detected.")
+                    
+            else:
+                st.error("Could not fetch data. Please check the ticker symbol and try again.")

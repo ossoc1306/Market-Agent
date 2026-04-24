@@ -60,7 +60,7 @@ with st.sidebar:
         st.rerun()
     st.info("Manual refresh clears the cache and pulls the latest data.")
 
-# --- 1. TABS NAVIGATION (Restructured with Architect Tab) ---
+# --- 1. TABS NAVIGATION ---
 tab_terminal, tab_lab, tab_rebalance, tab_architect = st.tabs([
     "🛡️ Multi-Asset Terminal", 
     "📈 Portfolio Lab", 
@@ -141,11 +141,24 @@ with tab_terminal:
     dbc_now = get_safe_data("DBC")
     xlb_now = get_safe_data("XLB")
 
-    # INDICATORS
+    # --- INDICATORS & NEW FAST AVERAGES ---
     sma_200d = get_sma("^GSPC", 200)
+    sma_20d = get_sma("^GSPC", 20)  # Fast trend for breakdown confirmation
     tnx_200ma = get_sma("^TNX", 200)
     btc_200ma = get_sma("BTC-USD", 200)
     avg_rsi = (calculate_rsi("^GSPC") + calculate_rsi("QQQ") + calculate_rsi("VXUS")) / 3
+    
+    # --- NEW BOND & REAL ESTATE PRICING ---
+    tlt_now = get_safe_data("TLT")
+    tlt_200ma = get_sma("TLT", 200)
+    xlre_now = get_safe_data("XLRE")
+    xlre_200ma = get_sma("XLRE", 200)
+    xlre_20ma = get_sma("XLRE", 20)
+    xlre_rsi = calculate_rsi("XLRE")
+    
+    # --- NEW GOLD DYNAMIC AVERAGES ---
+    gold_50ma = get_sma("GC=F", 50)
+    gold_200ma = get_sma("GC=F", 200)
 
     # --- 6 PILLARS OVERLAY (AUTOMATED) ---
     cols = st.columns(6)
@@ -161,16 +174,42 @@ with tab_terminal:
     # --- SCORECARD ---
     st.subheader("🎯 Asset Class Scorecard")
     sc = st.columns(5)
+    
+    # Updated to prioritize risk: If a red condition triggers, it overrides the green.
     def get_rating(green_cond, red_cond):
-        if green_cond: return "🟢 BULLISH"
         if red_cond: return "🔴 BEARISH"
+        if green_cond: return "🟢 BULLISH"
         return "🟡 NEUTRAL"
 
-    sc[0].metric("Stocks", get_rating(spx_now > sma_200d and avg_rsi < 65, spx_now < sma_200d or avg_rsi > 75))
-    sc[1].metric("Bonds", get_rating(tnx_now > short_rate, tnx_now < short_rate))
-    sc[2].metric("Gold", get_rating(gold_now/spx_now > 0.7 or avg_rsi < 45, dxy_now > 108))
-    sc[3].metric("Crypto", get_rating(btc_now > btc_200ma and dxy_now < 105, btc_now < btc_200ma or dxy_now > 107))
-    sc[4].metric("Real Estate", get_rating(calculate_rsi("XLRE") < 40, calculate_rsi("XLRE") > 70))
+    # Stocks: Bearish only if below 200MA OR (RSI is wildly overbought AND price breaks the 20-day MA).
+    sc[0].metric("Stocks", get_rating(
+        green_cond=spx_now > sma_200d, 
+        red_cond=spx_now < sma_200d or (avg_rsi > 80 and spx_now < sma_20d)
+    ))
+
+    # Bonds: Tracks actual TLT price vs 200MA. Small 2% buffer on the downside to prevent fake-outs.
+    sc[1].metric("Bonds", get_rating(
+        green_cond=tlt_now > tlt_200ma, 
+        red_cond=tlt_now < tlt_200ma * 0.98
+    ))
+
+    # Gold: Dynamic guardrails using 50MA and 200MA instead of static ratios.
+    sc[2].metric("Gold", get_rating(
+        green_cond=gold_now > gold_50ma, 
+        red_cond=gold_now < gold_200ma
+    ))
+
+    # Crypto: Requires a 5% crash through the 200MA to flash red, accommodating for high volatility.
+    sc[3].metric("Crypto", get_rating(
+        green_cond=btc_now > btc_200ma, 
+        red_cond=btc_now < btc_200ma * 0.95
+    ))
+
+    # Real Estate: Price vs 200MA, with a breakdown trigger similar to stocks.
+    sc[4].metric("Real Estate", get_rating(
+        green_cond=xlre_now > xlre_200ma, 
+        red_cond=xlre_now < xlre_200ma or (xlre_rsi > 80 and xlre_now < xlre_20ma)
+    ))
 
     st.divider()
 
